@@ -191,11 +191,13 @@ async function warn($: EngineInterface, usage: SessionUsage | undefined, now: nu
 
 async function refreshOnce($: EngineInterface, isForced: boolean) {
   const { snap, now } = await snapshot($)
-  $.ui.status(statusLine(snap, now, !(await isHintDrawn($))))
+  // The hint row draws everything when it can; the status line (drawn by the
+  // engine as a warning-coloured notice) then stays empty.
+  $.ui.status((await isHintDrawn($)) ? undefined : statusLine(snap, now))
   if (snap.usage) {
     const usage = snap.usage
     const deep = await readBreakdown($, now, isForced)
-    await update($, usageNow, () => usageState(usage, now, deep))
+    await update($, usageNow, () => ({ ...usageState(usage, now, deep), git: snap.git, rtkSaved: snap.rtk?.saved }))
   }
   await warn($, snap.usage, now)
 }
@@ -368,11 +370,8 @@ export const register: Register = (on, options) => {
     return done
   })
 
-  // The meters in colour on the hint row under the prompt, after the
-  // engine's own hint. While the person types or a turn runs, the engine's
-  // line says something they need (how to send, how to interrupt), so it
-  // always stays and the meters shrink or step aside; when idle its line is
-  // the `? for shortcuts` reminder, which gives way on a narrow terminal.
+  // The meters in colour on a row of their own under the engine's hint line,
+  // so they never crowd it or wrap when its text is long (auto mode's is).
   on('ui.render', { component: 'PromptHint' }, async ($, e, next) => {
     const snap = meterPlace === 'hint' ? await read($, usageNow) : null
     if (snap === null) {
@@ -380,17 +379,15 @@ export const register: Register = (on, options) => {
     }
 
     const columns = e.viewport?.columns ?? HINT_COLUMNS
-    const tail = e.props.tail === undefined ? 0 : [...e.props.tail].length + 1
-    const engineWidth = e.props.hint.trim() === '' ? 0 : [...e.props.hint].length + tail
-    const plan = planHint(snap, columns - HINT_RESERVE, engineWidth, e.props.isDraft || e.props.isWorking)
-    if (!plan) {
+    const runs = planHint(snap, columns - HINT_RESERVE)
+    if (!runs) {
       return next(e)
     }
 
     const { Box, Text } = $.ui.resolve(e)
     const meters = (
       <Text wrap="truncate-end">
-        {plan.runs.map(run =>
+        {runs.map(run =>
           run.color ? (
             <Text color={run.color}>{run.text}</Text>
           ) : run.isDim ? (
@@ -402,16 +399,13 @@ export const register: Register = (on, options) => {
       </Text>
     )
 
-    if (!plan.isEngineShown) {
-      return <Box flexDirection="row">{meters}</Box>
+    if (e.props.hint.trim() === '' && e.props.tail === undefined) {
+      return meters
     }
 
-    const engine = await next(e)
-
     return (
-      <Box flexDirection="row">
-        {engine}
-        <Text dimColor> │ </Text>
+      <Box flexDirection="column">
+        {await next(e)}
         {meters}
       </Box>
     )

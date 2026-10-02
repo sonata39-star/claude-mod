@@ -1,7 +1,8 @@
-// Progress meters drawn as text. Every glyph here is East Asian Width
-// "neutral", one cell on every terminal whatever its ambiguous-width setting.
-export const FILL = '▰'
-export const EMPTY = '▱'
+// Progress meters drawn as text. Box-drawing lines: terminals draw these
+// themselves, cell for cell, so a filled cell and an empty one are the same
+// size whatever the font (▰ ▱ came out at different sizes in some fonts).
+export const FILL = '━'
+export const EMPTY = '─'
 export const MARK = '╎'
 
 // The stacked bar's colours, one per category in order.
@@ -26,7 +27,7 @@ export function levelColor(percentUsed: number): string {
   return percentUsed >= 60 ? 'yellow' : 'green'
 }
 
-// The status line's 8-cell meter: "▰▰▰▱▱▱▱▱" at 42% used.
+// The status line's 8-cell meter: "━━━─────" at 42% used.
 export function miniBar(percentUsed: number, cells = 8): string {
   const filled = clamp(Math.round((percentUsed / 100) * cells), 0, cells)
 

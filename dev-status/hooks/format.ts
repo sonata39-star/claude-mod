@@ -1,10 +1,10 @@
 import type { SessionRateLimit, SessionUsage } from 'claude-code'
 
-import type { DevStatusUsage } from '../types'
+import type { DevStatusGit, DevStatusUsage } from '../types'
 import { levelColor, miniBar, miniBarRuns, resetAt, runsWidth } from './meter'
 import type { Run } from './meter'
 
-export type Git = { branch: string; dirty: number; ahead: number; behind: number }
+export type Git = DevStatusGit
 
 export type Rtk = { saved: number; percent: number }
 
@@ -74,7 +74,7 @@ export function limitName(kind: string): string {
   return LIMIT_NAME[kind] ?? kind.replace(/_/g, ' ')
 }
 
-// "5h ▰▰▱▱▱▱▱▱ 23% ↻14:30": the meter fills with what is used.
+// "5h ━━────── 23% ↻14:30": the meter fills with what is used.
 export function limitLabel(limit: SessionRateLimit, now: number): string {
   const flag = limit.percentUsed >= 80 ? '⚠ ' : ''
   const at = resetAt(limit.resetsAt, now)
@@ -116,7 +116,7 @@ export function gitLabel(git: Git): string {
   return `⎇ ${git.branch}${dirty}${ahead}${behind}`
 }
 
-// "ctx ▰▰▰▱▱▱▱▱ 42% 84k": the tokens in the window now, as used.
+// "ctx ━━━───── 42% 84k": the tokens in the window now, as used.
 export function contextLabel(usage: SessionUsage): string {
   const { tokens, window } = usage.context
   const used = usage.context.percent ?? (tokens === undefined ? undefined : Math.round((tokens / window) * 100))
@@ -152,17 +152,27 @@ export function statusLine(snapshot: Snapshot, now: number, isMetersShown = true
   return parts.length > 0 ? parts.join(SEP) : undefined
 }
 
-// How much the hint row's meters say: cells per meter, the limits' reset
-// times, the cost. Tried in this order until one fits.
-export type HintVariant = { cells: number; isResetShown: boolean; isCostShown: boolean }
+// How much the hint row says: cells per meter, the limits' reset times, the
+// cost, the branch, rtk's savings. Tried in this order until one fits.
+export type HintVariant = {
+  cells: number
+  isResetShown: boolean
+  isCostShown: boolean
+  isGitShown: boolean
+  isRtkShown: boolean
+}
+
+const ALL = { isResetShown: true, isCostShown: true, isGitShown: true, isRtkShown: true }
 
 export const HINT_VARIANTS: readonly HintVariant[] = [
-  { cells: 8, isResetShown: true, isCostShown: true },
-  { cells: 8, isResetShown: true, isCostShown: false },
-  { cells: 5, isResetShown: true, isCostShown: false },
-  { cells: 5, isResetShown: false, isCostShown: false },
-  { cells: 3, isResetShown: false, isCostShown: false },
-  { cells: 0, isResetShown: false, isCostShown: false },
+  { ...ALL, cells: 8 },
+  { ...ALL, cells: 8, isRtkShown: false },
+  { ...ALL, cells: 8, isRtkShown: false, isGitShown: false },
+  { ...ALL, cells: 8, isRtkShown: false, isGitShown: false, isCostShown: false },
+  { ...ALL, cells: 5, isRtkShown: false, isGitShown: false, isCostShown: false },
+  { cells: 5, isResetShown: false, isCostShown: false, isGitShown: false, isRtkShown: false },
+  { cells: 3, isResetShown: false, isCostShown: false, isGitShown: false, isRtkShown: false },
+  { cells: 0, isResetShown: false, isCostShown: false, isGitShown: false, isRtkShown: false },
 ]
 
 const HINT_SEP: Run = { text: ' │ ', isDim: true }
@@ -176,9 +186,13 @@ function meterRuns(label: string, percentUsed: number, shown: string, cells: num
 }
 
 // The hint row's meters, coloured by level:
-// "ctx ▰▰▰▱▱▱▱▱ 42% │ 5h ▰▰▱▱▱▱▱▱ 24% ↻14:30 │ 7d ▰▱▱▱▱▱▱▱ 9% ↻จ. 09:00 │ $1.23"
+// "⎇ main ±3 │ ctx ━━━───── 42% │ 5h ━━────── 24% ↻14:30 │ 7d ━─────── 9% ↻จ. 09:00 │ $1.23 │ rtk −13.3M"
 export function hintRuns(snap: DevStatusUsage, variant: HintVariant): Run[] {
   const groups: Run[][] = []
+
+  if (variant.isGitShown && snap.git) {
+    groups.push([{ text: gitLabel(snap.git), color: 'cyan' }])
+  }
 
   if (snap.contextPercent !== undefined) {
     groups.push(meterRuns('ctx', snap.contextPercent, `${snap.contextPercent}%`, variant.cells))
@@ -191,38 +205,23 @@ export function hintRuns(snap: DevStatusUsage, variant: HintVariant): Run[] {
   if (variant.isCostShown && snap.costUsd !== undefined && groups.length > 0) {
     groups.push([{ text: `$${snap.costUsd.toFixed(2)}`, isDim: true }])
   }
+  if (variant.isRtkShown && snap.rtkSaved !== undefined && snap.rtkSaved > 0) {
+    groups.push([{ text: `rtk −${compact(snap.rtkSaved)}`, isDim: true }])
+  }
 
   return groups.flatMap((group, i) => (i === 0 ? group : [HINT_SEP, ...group]))
 }
 
-// What the hint row draws in `room` cells beside the engine's own line of
-// `engineWidth` (0 when it has none): the richest meters that fit beside it;
-// else, where the engine's line may go, the richest that fit alone; else
-// nothing (undefined), and the engine draws its line as ever.
-export function planHint(
-  snap: DevStatusUsage,
-  room: number,
-  engineWidth: number,
-  isEngineKept: boolean,
-): { runs: Run[]; isEngineShown: boolean } | undefined {
+// The richest meters that fit in `room` cells on a row of their own (under
+// the engine's hint line), or undefined when there is nothing to show.
+export function planHint(snap: DevStatusUsage, room: number): Run[] | undefined {
   const variants = HINT_VARIANTS.map(variant => hintRuns(snap, variant))
 
-  if (variants[0]?.length === 0) {
+  if (variants.at(-1)?.length === 0) {
     return undefined
   }
 
-  const beside = engineWidth > 0 ? engineWidth + runsWidth([HINT_SEP]) : 0
-  const fitting = variants.find(runs => beside + runsWidth(runs) <= room)
-  if (fitting) {
-    return { runs: fitting, isEngineShown: engineWidth > 0 }
-  }
-  if (isEngineKept) {
-    return undefined
-  }
-
-  const alone = variants.find(runs => runsWidth(runs) <= room)
-
-  return alone ? { runs: alone, isEngineShown: false } : undefined
+  return variants.find(runs => runsWidth(runs) <= room)
 }
 
 // The figures the usage pane draws, kept in $.state so the pane redraws when

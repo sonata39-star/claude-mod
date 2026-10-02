@@ -117,17 +117,17 @@ function world(on: On, usage: { current: SessionUsage }, surfaces?: ('terminal' 
 
 describe('meters', () => {
   test('fill with what is used, in neutral-width glyphs', () => {
-    expect(miniBar(42)).toBe('▰▰▰▱▱▱▱▱')
-    expect(miniBar(0)).toBe('▱▱▱▱▱▱▱▱')
-    expect(miniBar(140)).toBe('▰▰▰▰▰▰▰▰')
+    expect(miniBar(42)).toBe('━━━─────')
+    expect(miniBar(0)).toBe('────────')
+    expect(miniBar(140)).toBe('━━━━━━━━')
     expect(barRuns(50, 10, 80)).toEqual([
-      { text: '▰▰▰▰▰', color: 'green' },
-      { text: '▱▱▱', isDim: true },
+      { text: '━━━━━', color: 'green' },
+      { text: '───', isDim: true },
       { text: '╎', color: 'magenta' },
-      { text: '▱', isDim: true },
+      { text: '─', isDim: true },
     ])
-    expect(barRuns(70, 4)[0]).toEqual({ text: '▰▰▰', color: 'yellow' })
-    expect(barRuns(90, 4)[0]).toEqual({ text: '▰▰▰▰', color: 'red' })
+    expect(barRuns(70, 4)[0]).toEqual({ text: '━━━', color: 'yellow' })
+    expect(barRuns(90, 4)[0]).toEqual({ text: '━━━━', color: 'red' })
   })
 
   test('stack categories so the cells add up', () => {
@@ -153,12 +153,12 @@ describe('format', () => {
 
   test('draws each limit as a meter of what is used, with its reset', () => {
     expect(limitLabel({ kind: 'five_hour', percentUsed: 23.5, resetsAt: FIVE_HOUR_RESET }, NOW)).toBe(
-      '5h ▰▰▱▱▱▱▱▱ 24% ↻14:30',
+      '5h ━━────── 24% ↻14:30',
     )
     expect(limitLabel({ kind: 'seven_day', percentUsed: 82, resetsAt: SEVEN_DAY_RESET }, NOW)).toBe(
-      '⚠ 7d ▰▰▰▰▰▰▰▱ 82% ↻จ. 09:00',
+      '⚠ 7d ━━━━━━━─ 82% ↻จ. 09:00',
     )
-    expect(contextLabel(usageAt(0, 42))).toBe('ctx ▰▰▰▱▱▱▱▱ 42% 84k')
+    expect(contextLabel(usageAt(0, 42))).toBe('ctx ━━━───── 42% 84k')
   })
 
   test('reads rtk savings and leaves out what it cannot read', () => {
@@ -176,7 +176,7 @@ describe('status line', () => {
     await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
 
     expect(statuses.at(-1)).toBe(
-      '⎇ main ±3 ↑1 │ ctx ▰▰▰▱▱▱▱▱ 42% 84k │ 5h ▰▰▱▱▱▱▱▱ 24% ↻14:30 │ 7d ▰▱▱▱▱▱▱▱ 9% ↻จ. 09:00 │ $1.23 │ rtk −13.3M',
+      '⎇ main ±3 ↑1 │ ctx ━━━───── 42% 84k │ 5h ━━────── 24% ↻14:30 │ 7d ━─────── 9% ↻จ. 09:00 │ $1.23 │ rtk −13.3M',
     )
   })
 
@@ -188,7 +188,7 @@ describe('status line', () => {
     usage.current = usageAt(61, 42)
     await clock.advance(30_000)
 
-    expect(statuses.at(-1)).toContain('5h ▰▰▰▰▰▱▱▱ 61% ↻14:30')
+    expect(statuses.at(-1)).toContain('5h ━━━━━─── 61% ↻14:30')
   })
 
   test('warns once when a limit crosses 80% and once more at 95%', async ($, on) => {
@@ -232,12 +232,12 @@ describe('usage pane', () => {
 
       // Context: 42% of 40 cells, the auto-compact mark at 80%.
       expect(await ui.find({ type: 'Text', text: /^Context {2}ใช้ไป 42% · เหลือ 58%$/ })).toBeDefined()
-      expect(await ui.find({ type: 'Text', text: `${'▰'.repeat(17)}${'▱'.repeat(15)}╎${'▱'.repeat(7)}` })).toBeDefined()
+      expect(await ui.find({ type: 'Text', text: `${'━'.repeat(17)}${'─'.repeat(15)}╎${'─'.repeat(7)}` })).toBeDefined()
       expect(await ui.find({ type: 'Text', text: '84,000 / 200,000 tokens · auto-compact ที่ 160k ╎' })).toBeDefined()
 
       // 5-hour: 23.5% → 9 green cells, reset as clock time and countdown.
       expect(await ui.find({ type: 'Text', text: /^5-hour limit {2}ใช้ไป 23\.5% · เหลือ 76\.5%$/ })).toBeDefined()
-      const filled = await ui.find({ type: 'Text', text: /^▰{9}$/ })
+      const filled = await ui.find({ type: 'Text', text: /^━{9}$/ })
       expect(filled?.props.color).toBe('green')
       expect(await ui.find({ type: 'Text', text: 'รีเซ็ต 14:30 · อีก 2ชม 13น' })).toBeDefined()
 
@@ -246,7 +246,7 @@ describe('usage pane', () => {
 
       // The breakdown, largest first, and the footer.
       expect(await ui.find({ type: 'Text', text: 'Context แยกตามประเภท' })).toBeDefined()
-      expect(await ui.find({ type: 'Text', text: /▰ Messages 67k {2}▰ System tools 12k {2}▰ System prompt 3k/ })).toBeDefined()
+      expect(await ui.find({ type: 'Text', text: /━ Messages 67k {2}━ System tools 12k {2}━ System prompt 3k/ })).toBeDefined()
       expect(await ui.find({ type: 'Text', text: /Cost \$1\.23 · อัปเดต 12:17/ })).toBeDefined()
 
       await ui.unmount()
@@ -307,40 +307,40 @@ function hintAt(columns: number, hint: string, isWorking = false) {
 
 describe('hint row', () => {
   test('says the meters in full where there is room, and less where there is not', () => {
-    expect(text(hintRuns(HINT_SNAP, HINT_VARIANTS[0]!))).toBe(
-      'ctx ▰▰▰▱▱▱▱▱ 42% │ 5h ▰▰▱▱▱▱▱▱ 24% ↻14:30 │ 7d ▰▱▱▱▱▱▱▱ 9% ↻จ. 09:00 │ $1.23',
+    const full = { ...HINT_SNAP, git: { branch: 'main', dirty: 3, ahead: 1, behind: 0 }, rtkSaved: 13_300_000 }
+
+    expect(text(hintRuns(full, HINT_VARIANTS[0]!))).toBe(
+      '⎇ main ±3 ↑1 │ ctx ━━━───── 42% │ 5h ━━────── 24% ↻14:30 │ 7d ━─────── 9% ↻จ. 09:00 │ $1.23 │ rtk −13.3M',
     )
-    expect(text(hintRuns(HINT_SNAP, HINT_VARIANTS.at(-1)!))).toBe('ctx 42% │ 5h 24% │ 7d 9%')
+    expect(text(hintRuns(full, HINT_VARIANTS.at(-1)!))).toBe('ctx 42% │ 5h 24% │ 7d 9%')
 
-    const wide = planHint(HINT_SNAP, 156, 15, false)
-    expect(wide?.isEngineShown).toBe(true)
-    expect(text(wide?.runs ?? [])).toContain('$1.23')
+    expect(text(planHint(full, 156) ?? [])).toContain('rtk −13.3M')
+    expect(text(planHint(full, 90) ?? [])).not.toContain('rtk')
 
-    // Too narrow for both: the idle reminder gives way, the meters shrink.
-    const narrow = planHint(HINT_SNAP, 36, 15, false)
-    expect(narrow?.isEngineShown).toBe(false)
-    expect(runsWidth(narrow?.runs ?? [])).toBeLessThanOrEqual(36)
+    const narrow = planHint(full, 36) ?? []
+    expect(runsWidth(narrow)).toBeLessThanOrEqual(36)
+    expect(text(narrow)).toContain('ctx')
 
-    // ...but a line the person needs (typing, a turn running) stays whole.
-    expect(planHint(HINT_SNAP, 36, 15, true)).toBeUndefined()
-    expect(planHint({ ...HINT_SNAP, contextPercent: undefined, limits: [] }, 156, 15, false)).toBeUndefined()
+    expect(planHint({ ...HINT_SNAP, contextPercent: undefined, limits: [] }, 156)).toBeUndefined()
   })
 
-  test('draws the meters in colour after the engine line, on terminal and desktop', async ($, on) => {
+  test('draws the meters in colour on their own row under the engine line, on terminal and desktop', async ($, on) => {
     const { statuses } = world(on, { current: usageAt(23.5, 42) }, ['terminal'])
 
     await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
-    // The meters left the plain status line for the hint row.
-    expect(statuses.at(-1)).toBe('⎇ main ±3 ↑1 │ rtk −13.3M')
+    // Everything moved to the hint row: no warning-coloured status line.
+    expect(statuses.at(-1)).toBeUndefined()
 
     for (const surface of ['terminal', 'desktop'] as const) {
       const ui = await $.ui.mount({ ...hintAt(160, '? for shortcuts'), surface })
 
       expect(await ui.find({ type: 'Text', text: /^\? for shortcuts$/ })).toBeDefined()
-      expect(await ui.find({ type: 'Text', text: /^ctx ▰▰▰▱▱▱▱▱ 42% │ 5h ▰▰▱▱▱▱▱▱ 24% ↻14:30 │ 7d ▰▱▱▱▱▱▱▱ 9% ↻จ\. 09:00 │ \$1\.23$/ })).toBeDefined()
-      expect((await ui.find({ type: 'Text', text: /^▰▰▰$/ }))?.props.color).toBe('green')
+      expect(
+        await ui.find({ type: 'Text', text: /^⎇ main ±3 ↑1 │ ctx ━━━───── 42% │ 5h ━━────── 24% ↻14:30 │ 7d ━─────── 9% ↻จ\. 09:00 │ \$1\.23 │ rtk −13\.3M$/ }),
+      ).toBeDefined()
+      expect((await ui.find({ type: 'Text', text: /^━━━$/ }))?.props.color).toBe('green')
       expect((await ui.find({ type: 'Text', text: /^ 42%$/ }))?.props.color).toBe('green')
-      expect((await ui.find({ type: 'Text', text: /^▱▱▱▱▱$/ }))?.props.dimColor).toBe(true)
+      expect((await ui.find({ type: 'Text', text: /^─────$/ }))?.props.dimColor).toBe(true)
 
       await ui.unmount()
     }
@@ -354,25 +354,22 @@ describe('hint row', () => {
     const ui = await $.ui.mount({ ...hintAt(160, '? for shortcuts'), surface: 'terminal' })
 
     expect((await ui.find({ type: 'Text', text: /^ 70%$/ }))?.props.color).toBe('yellow')
-    expect((await ui.find({ type: 'Text', text: /^▰▰▰▰▰▰▰$/ }))?.props.color).toBe('red')
+    expect((await ui.find({ type: 'Text', text: /^━━━━━━━$/ }))?.props.color).toBe('red')
     expect((await ui.find({ type: 'Text', text: /^ 92%$/ }))?.props.color).toBe('red')
     await ui.unmount()
   })
 
-  test('on a narrow terminal the idle hint gives way, a running turn keeps its line', async ($, on) => {
+  test('on a narrow terminal the meters shrink and the engine line stays whole', async ($, on) => {
     world(on, { current: usageAt(23.5, 42) }, ['terminal'])
 
     await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
 
-    const idle = await $.ui.mount({ ...hintAt(40, '? for shortcuts'), surface: 'terminal' })
-    expect(await idle.find({ type: 'Text', text: /shortcuts/ })).toBeUndefined()
-    expect(await idle.find({ type: 'Text', text: /^ctx ▰▱▱ 42% │ 5h ▰▱▱ 24% │ 7d ▱▱▱ 9%$/ })).toBeDefined()
-    await idle.unmount()
-
-    const working = await $.ui.mount({ ...hintAt(40, 'esc to interrupt · ctrl+t to show todos', true), surface: 'terminal' })
-    expect(await working.find({ type: 'Text', text: /^esc to interrupt · ctrl\+t to show todos$/ })).toBeDefined()
-    expect(await working.find({ type: 'Text', text: /▰/ })).toBeUndefined()
-    await working.unmount()
+    for (const hint of ['? for shortcuts', 'esc to interrupt · ctrl+t to show todos']) {
+      const ui = await $.ui.mount({ ...hintAt(40, hint, hint.startsWith('esc')), surface: 'terminal' })
+      expect(await ui.find({ type: 'Text', text: hint })).toBeDefined()
+      expect(await ui.find({ type: 'Text', text: /^ctx ━── 42% │ 5h ━── 24% │ 7d ─── 9%$/ })).toBeDefined()
+      await ui.unmount()
+    }
   })
 
   test('keeps the meters on the status line where a surface draws no hint row', async ($, on) => {
@@ -380,18 +377,18 @@ describe('hint row', () => {
 
     await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
 
-    expect(statuses.at(-1)).toContain('ctx ▰▰▰▱▱▱▱▱ 42% 84k')
+    expect(statuses.at(-1)).toContain('ctx ━━━───── 42% 84k')
   })
 
   test('meterPlace "status" puts everything back on the status line', { options: { meterPlace: 'status' } }, async ($, on) => {
     const { statuses } = world(on, { current: usageAt(23.5, 42) }, ['terminal'])
 
     await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
-    expect(statuses.at(-1)).toContain('5h ▰▰▱▱▱▱▱▱ 24% ↻14:30')
+    expect(statuses.at(-1)).toContain('5h ━━────── 24% ↻14:30')
 
     const ui = await $.ui.mount({ ...hintAt(160, '? for shortcuts'), surface: 'terminal' })
     expect(await ui.find({ type: 'Text', text: /^\? for shortcuts$/ })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: /▰/ })).toBeUndefined()
+    expect(await ui.find({ type: 'Text', text: /━/ })).toBeUndefined()
     await ui.unmount()
   })
 })

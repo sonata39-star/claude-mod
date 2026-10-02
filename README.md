@@ -7,7 +7,7 @@
 | [🛡️ dev-guard](./dev-guard/) | บล็อกคำสั่งอันตราย ถามก่อนคำสั่งเสี่ยง และกันไม่ให้ secret/token หลุดลงโค้ด |
 | [✅ auto-check](./auto-check/) | แก้ไฟล์ปุ๊บรัน linter ทันที และ type-check ก่อน Claude จบงาน ถ้าพังส่ง error กลับให้ Claude แก้ต่อ |
 | [🔔 done-notify](./done-notify/) | เสียง + notification เมื่องานยาวเสร็จ หรือเมื่อ Claude รอให้ตอบ |
-| [📊 dev-status](./dev-status/) | แถบ progress มีสีใต้ช่องพิมพ์: token ที่ใช้, limit 5 ชม. / 7 วัน พร้อมเวลารีเซ็ต, ค่าใช้จ่าย |
+| [📊 dev-status](./dev-status/) | แถบ progress มีสีใต้ช่องพิมพ์: git branch, token ที่ใช้, limit 5 ชม. / 7 วัน พร้อมเวลารีเซ็ต, ค่าใช้จ่าย |
 | [🗂️ dev-dashboard](./dev-dashboard/) | pane สรุป session: ไฟล์ที่แก้, คำสั่งที่รัน, ผล test, สิ่งที่ถูกบล็อก |
 | [👥 team-flow](./team-flow/) | แถบแสดง pipeline BA → Lead → Dev → Review → Sec ของทีม agent |
 | [📝 standup](./standup/) | `/standup` สรุปงานวันนี้เป็นภาษาไทย แล้วคัดลอกให้ |
