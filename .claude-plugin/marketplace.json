@@ -39,14 +39,14 @@
     {
       "name": "dev-dashboard",
       "source": "./dev-dashboard",
-      "description": "A live pane of this session: files edited, recent commands, checks, denials, turns and usage",
+      "description": "A full-height right sidebar menu of this session: files edited, recent commands, checks, denials and the team pipeline; hides on small screens",
       "version": "0.1.0",
       "category": "productivity"
     },
     {
       "name": "team-flow",
       "source": "./team-flow",
-      "description": "Band above the prompt showing the BA → Lead → Dev → Review → Sec pipeline from .team/ files",
+      "description": "The BA → Lead → Dev → Review → Sec pipeline from .team/ files, in the right sidebar or as a band above the prompt",
       "version": "0.1.0",
       "category": "productivity"
     },

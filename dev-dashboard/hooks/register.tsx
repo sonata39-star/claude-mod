@@ -1,47 +1,60 @@
 import { atom, read, update } from 'claude-code'
-import type { EngineInterface, Register } from 'claude-code'
+import type { EngineInterface, Register, RenderViewport } from 'claude-code'
 
-import type { DashboardCommand, DashboardFile, DashboardUsage } from '../types'
-import { clockTime, duration, exactPercent, fit, fitPath, isCheck, relative, usageMeters } from './format'
-import { barRuns, levelColor } from './meter'
+import type { DashboardCommand, DashboardFile } from '../types'
+import { isCheck } from './format'
+import { layoutDock, layoutInline } from './sidebar'
+import type { Cell } from './sidebar'
 
 const PANE = 'dev-dashboard'
 const TITLE = 'Dashboard'
 
 const MAX_FILES = 50
-const MAX_COMMANDS = 10
+const MAX_COMMANDS = 20
 const MAX_DENIES = 10
 const MAX_CHECKS = 8
-const SHOWN_FILES = 12
-const REFRESH_MS = 30_000
+
+// Inline (asked for on a small screen): this many rows above the prompt.
+const INLINE_ROWS = 8
+// The dock's share of the screen when `sidebarColumns` is 0, and its bounds.
+const DOCK_SHARE = 0.28
+const DOCK_MIN = 34
+const DOCK_MAX = 48
+// A width change settles this long before the sidebar hides or comes back.
+const SETTLE_MS = 250
+const RECHECK_MS = 30_000
 
 const files = atom({ plugin: 'dev-dashboard', key: 'files' } as const, [])
 const commands = atom({ plugin: 'dev-dashboard', key: 'commands' } as const, [])
 const denies = atom({ plugin: 'dev-dashboard', key: 'denies' } as const, [])
 const checks = atom({ plugin: 'dev-dashboard', key: 'checks' } as const, [])
 const turns = atom({ plugin: 'dev-dashboard', key: 'turns' } as const, { count: 0, totalMs: 0, lastMs: 0 })
-const usage = atom({ plugin: 'dev-dashboard', key: 'usage' } as const, null)
+const tab = atom({ plugin: 'dev-dashboard', key: 'tab' } as const, 'files')
+const isClosedByPerson = atom({ plugin: 'dev-dashboard', key: 'isClosedByPerson' } as const, false)
+const isAutoHidden = atom({ plugin: 'dev-dashboard', key: 'isAutoHidden' } as const, false)
+const isAskedSmall = atom({ plugin: 'dev-dashboard', key: 'isAskedSmall' } as const, false)
+const isDocked = atom({ plugin: 'dev-dashboard', key: 'isDocked' } as const, false)
+// team-flow's, read only: absent while it is not installed.
+const teamSnapshot = atom({ plugin: 'team-flow', key: 'snapshot' } as const, null)
+const teamRunning = atom({ plugin: 'team-flow', key: 'running' } as const, [])
 
-// The session's directory, so paths under it show short; set again on every
-// load, as `session.start` fires after each reload.
+// This load's settings and what the render sites last measured; a reload
+// sets them again (`register`, then the next render).
+let isAutoOpen = true
+let minColumns = 120
+let sidebarColumns = 0
 let cwd = ''
+let view: { columns: number; isFullscreen: boolean } | undefined
+let placement: 'dock' | 'inline' | undefined
+let isSettling = false
 
-async function refreshUsage($: EngineInterface) {
-  try {
-    const now = await $.session.usage()
-    const at = await $.clock.now()
-    const next: DashboardUsage = {
-      at,
-      contextPercent: now.context.percent,
-      contextTokens: now.context.tokens,
-      window: now.context.window,
-      costUsd: now.cost?.usd,
-      limits: now.rateLimits.map(limit => ({ ...limit })),
-    }
-    await update($, usage, () => next)
-  } catch {
-    // Figures the engine cannot give now stay as they were.
-  }
+function dockColumns(columns: number): number {
+  return sidebarColumns > 0 ? sidebarColumns : Math.max(DOCK_MIN, Math.min(DOCK_MAX, Math.round(columns * DOCK_SHARE)))
+}
+
+// A sidebar fits where the layout docks panes and the screen is wide enough.
+function isRoomy(columns: number, isFullscreen: boolean): boolean {
+  return isFullscreen && columns >= minColumns
 }
 
 async function clearAll($: EngineInterface) {
@@ -50,6 +63,93 @@ async function clearAll($: EngineInterface) {
   await update($, denies, () => [])
   await update($, checks, () => [])
   await update($, turns, () => ({ count: 0, totalMs: 0, lastMs: 0 }))
+}
+
+async function paneNow($: EngineInterface) {
+  try {
+    const panes = await $.ui.panes()
+
+    return panes.find(pane => pane.id === PANE)
+  } catch {
+    return undefined
+  }
+}
+
+// Hides the sidebar when the screen got too small for it, brings it back
+// when it widens (only if it hid itself), and opens it the first time where
+// `autoOpen` says so; never against the person's own close.
+async function reconcile($: EngineInterface) {
+  if (!view) {
+    return
+  }
+
+  const { columns, isFullscreen } = view
+  const isFitting = isRoomy(columns, isFullscreen)
+  const pane = await paneNow($)
+  const isDockedNow = pane !== undefined && pane.isPlaced && pane.isShown && placement === 'dock' && isFitting
+
+  if ((await read($, isDocked)) !== isDockedNow) {
+    await update($, isDocked, () => isDockedNow)
+  }
+
+  if (pane) {
+    const isAsked = await read($, isAskedSmall)
+    if (isFitting && isAsked) {
+      await update($, isAskedSmall, () => false)
+    }
+    if (!isFitting && !isAsked) {
+      await update($, isAutoHidden, () => true)
+      await update($, isDocked, () => false)
+      await $.ui.close({ id: PANE })
+      if (pane.isPlaced) {
+        $.ui.toast('ซ่อน dashboard เพราะจอแคบ ขยายจอหรือพิมพ์ /dashboard', { timeoutMs: 6_000 })
+      }
+    }
+
+    return
+  }
+
+  if (!isFitting || (await read($, isClosedByPerson))) {
+    return
+  }
+
+  const wasHidden = await read($, isAutoHidden)
+  if (wasHidden || isAutoOpen) {
+    await update($, isAutoHidden, () => false)
+    await $.ui.open({ id: PANE, title: TITLE, columns: dockColumns(columns) })
+    settle($)
+  }
+}
+
+// Reconciles once things settle, outside the render that noticed a change.
+function settle($: EngineInterface) {
+  if (!isSettling) {
+    isSettling = true
+    $.clock.after(SETTLE_MS, () => {
+      isSettling = false
+      void reconcile($)
+    })
+  }
+}
+
+// Keeps what a render site measured, and where the pane was seated.
+function noteView($: EngineInterface, viewport: RenderViewport | undefined, seated?: 'dock' | 'inline') {
+  let isChanged = false
+
+  if (seated !== undefined && seated !== placement) {
+    placement = seated
+    isChanged = true
+  }
+  if (viewport && viewport.isFullscreen !== undefined) {
+    const next = { columns: viewport.columns, isFullscreen: viewport.isFullscreen }
+    if (!view || view.columns !== next.columns || view.isFullscreen !== next.isFullscreen) {
+      view = next
+      isChanged = true
+    }
+  }
+  if (isChanged) {
+    settle($)
+  }
 }
 
 function editedPath(e: { tool: string; file_path?: unknown; notebook_path?: unknown }): string | undefined {
@@ -74,24 +174,34 @@ function finish(list: DashboardCommand[], id: string, isFailed: boolean): Dashbo
   return list.map(one => (one.id === id ? { ...one, isDone: true, isFailed } : one))
 }
 
-export const register: Register = on => {
+function cellProps(cell: Cell) {
+  return {
+    ...(cell.color === undefined ? {} : { color: cell.color }),
+    ...(cell.isDim ? { dimColor: true } : {}),
+    ...(cell.isBold ? { bold: true } : {}),
+  }
+}
+
+export const register: Register = (on, options) => {
+  isAutoOpen = options.autoOpen !== false
+  minColumns = typeof options.minColumns === 'number' && options.minColumns > 0 ? options.minColumns : 120
+  sidebarColumns = typeof options.sidebarColumns === 'number' && options.sidebarColumns > 0 ? options.sidebarColumns : 0
+
   on('session.start', async ($, e, next) => {
     const started = await next(e)
     cwd = e.cwd
 
     await $.command.register({
       name: 'dashboard',
-      description: 'เปิด pane สรุป session: ไฟล์ที่แก้, คำสั่ง, ผล test, สิ่งที่ถูกบล็อก, usage',
+      description: 'เปิดเมนู dashboard ด้านขวา: ไฟล์ที่แก้, คำสั่ง, ผล test, สิ่งที่ถูกบล็อก',
       argumentHint: '[close]',
     })
-    await refreshUsage($)
     if (e.isInteractive) {
-      // Keeps the meters and their reset countdowns current between turns.
-      $.clock.every(REFRESH_MS, () => {
-        void refreshUsage($)
+      // The first render measures the screen and opens the sidebar where it
+      // fits; this catches a change no render reported.
+      $.clock.every(RECHECK_MS, () => {
+        void reconcile($)
       })
-      // Unasked: the surface seats it only where it fits as a sidebar.
-      void $.ui.open({ id: PANE, title: TITLE })
     }
 
     return started
@@ -107,14 +217,46 @@ export const register: Register = on => {
 
   on('command.run', { command: 'dashboard' }, async ($, e) => {
     if (e.args.trim() === 'close') {
+      await update($, isClosedByPerson, () => true)
+      await update($, isAutoHidden, () => false)
       await $.ui.close({ id: PANE })
 
-      return { text: 'ปิด dashboard แล้ว' }
+      return { text: 'ปิด dashboard แล้ว (เปิดใหม่ด้วย /dashboard)' }
     }
 
-    const opened = await $.ui.open({ id: PANE, title: TITLE })
+    const { columns, isFullscreen } = e.presentation
+    view = { columns, isFullscreen }
+    await update($, isClosedByPerson, () => false)
+    await update($, isAutoHidden, () => false)
 
-    return { text: opened.isPlaced ? 'เปิด dashboard แล้ว' : `dashboard รอที่อยู่: ${opened.reason}` }
+    if (isRoomy(columns, isFullscreen)) {
+      await update($, isAskedSmall, () => false)
+      await $.ui.open({ id: PANE, title: TITLE, columns: dockColumns(columns) })
+      settle($)
+
+      return { text: 'เปิด dashboard ด้านขวาแล้ว' }
+    }
+
+    // They asked on a small screen: a few rows above the prompt, Esc closes.
+    await update($, isAskedSmall, () => true)
+    await update($, isDocked, () => false)
+    await $.ui.open({ id: PANE, title: TITLE, rows: INLINE_ROWS, closeOnEscape: true })
+
+    return { text: 'จอแคบเกินแถบด้านขวา เปิดแบบย่อเหนือช่องพิมพ์แทน (Esc ปิด)' }
+  })
+
+  // The person's own close sticks for the session, reloads included.
+  on('ui.close', async ($, e, next) => {
+    if (e.id === PANE) {
+      await update($, isDocked, () => false)
+    }
+    if (e.id === PANE && e.origin.kind === 'person') {
+      await update($, isClosedByPerson, () => true)
+      await update($, isAutoHidden, () => false)
+      await update($, isAskedSmall, () => false)
+    }
+
+    return next(e)
   })
 
   on('tool.call', async ($, e, next) => {
@@ -163,123 +305,89 @@ export const register: Register = on => {
 
     if (e.agentId === undefined) {
       await update($, turns, now => ({ count: now.count + 1, totalMs: now.totalMs + e.durationMs, lastMs: e.durationMs }))
-      await refreshUsage($)
     }
 
     return done
   })
 
-  on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
-    const { Box, Button, Text } = $.ui.resolve(e)
-    const width = Math.max(20, e.props.bodyColumns)
-    const fileList = await read($, files)
-    const commandList = await read($, commands)
-    const denyList = await read($, denies)
-    const checkList = await read($, checks)
-    const turnStats = await read($, turns)
-    const usageNow = await read($, usage)
+  // Sites drawn whether or not the sidebar is open, read only for the
+  // screen's size: each re-runs when the width changes.
+  on('ui.render', { component: 'AbovePrompt' }, ($, e, next) => {
+    noteView($, e.viewport)
 
-    const turnLine =
-      turnStats.count === 0
-        ? 'ยังไม่มี turn'
-        : `${turnStats.count} turns · รวม ${duration(turnStats.totalMs)} · ล่าสุด ${duration(turnStats.lastMs)}`
-    const isEmpty = fileList.length + commandList.length + denyList.length + checkList.length === 0
-    const cost = usageNow?.costUsd === undefined ? '' : ` · $${usageNow.costUsd.toFixed(2)}`
+    return next(e)
+  })
+
+  on('ui.render', { component: 'PromptHint' }, ($, e, next) => {
+    noteView($, e.viewport)
+
+    return next(e)
+  })
+
+  on('ui.render', { component: 'SessionMode' }, ($, e, next) => {
+    noteView($, e.viewport)
+
+    return next(e)
+  })
+
+  on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
+    noteView($, e.viewport, e.props.placement)
+
+    const { Box, Button, Text } = $.ui.resolve(e)
+    const width = Math.max(16, e.props.bodyColumns)
+    const height = Math.max(4, e.props.scroll.bodyRows)
+    const data = {
+      files: await read($, files),
+      commands: await read($, commands),
+      checks: await read($, checks),
+      denies: await read($, denies),
+      turns: await read($, turns),
+      tab: await read($, tab),
+      cwd,
+      team: { snapshot: await read($, teamSnapshot), running: await read($, teamRunning) },
+    }
+    const layout = e.props.placement === 'dock' ? layoutDock(data, width, height) : layoutInline(data, width, height)
 
     return (
-      <Box flexDirection="column">
-        <Text bold>{fit(`${turnLine}${cost}`, width)}</Text>
-
-        {usageNow !== null && (
-          <Box flexDirection="column" marginTop={1}>
-            {usageMeters(usageNow).map(meter => (
-              <Box key={meter.key} flexDirection="column">
-                <Text>
-                  <Text bold>{meter.label}</Text>
-                  {meter.percentUsed === undefined ? (
-                    <Text dimColor> –</Text>
-                  ) : (
-                    <Text>
-                      {' '}
-                      <Text color={levelColor(meter.percentUsed)}>ใช้ไป {exactPercent(meter.percentUsed)}</Text>
-                      <Text dimColor> · เหลือ {exactPercent(Math.max(0, 100 - meter.percentUsed))}</Text>
-                    </Text>
-                  )}
-                  {meter.tail !== undefined && <Text dimColor> · {meter.tail}</Text>}
-                </Text>
+      <Box flexDirection="column" height={height}>
+        {layout.rows.map(row => {
+          switch (row.kind) {
+            case 'line':
+              return (
                 <Text wrap="truncate-end">
-                  {barRuns(meter.percentUsed ?? 0, width).map(run =>
-                    run.color ? <Text color={run.color}>{run.text}</Text> : <Text dimColor>{run.text}</Text>,
-                  )}
+                  {row.cells.map(cell => (
+                    <Text {...cellProps(cell)}>{cell.text}</Text>
+                  ))}
                 </Text>
-              </Box>
-            ))}
-          </Box>
-        )}
-
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>ไฟล์ที่แก้ ({fileList.length})</Text>
-          {fileList.length === 0 && <Text dimColor> ยังไม่มี</Text>}
-          {fileList.slice(0, SHOWN_FILES).map(file => (
-            <Text>
-              {' '}
-              <Text color="cyan">×{file.edits}</Text> {fitPath(relative(file.path, cwd), width - 12)}{' '}
-              <Text dimColor>{clockTime(file.lastAt)}</Text>
-            </Text>
-          ))}
-          {fileList.length > SHOWN_FILES && <Text dimColor> +{fileList.length - SHOWN_FILES} ไฟล์</Text>}
+              )
+            case 'tabs':
+              return (
+                <Box flexDirection="row" gap={1}>
+                  {row.tabs.map(one => (
+                    <Button
+                      key={`tab-${one.id}`}
+                      label={one.label}
+                      hotkey={one.hotkey}
+                      {...(one.isSelected ? { variant: 'primary' as const } : {})}
+                      onPress={() => update($, tab, () => one.id)}
+                    />
+                  ))}
+                </Box>
+              )
+            case 'rule':
+              return <Text dimColor>{'─'.repeat(width)}</Text>
+            case 'blank':
+              return <Text> </Text>
+          }
+        })}
+        <Box flexGrow={1} />
+        <Box key="footer" flexDirection="row">
+          <Button key="clear" label="ล้าง" hotkey="c" plain onPress={() => clearAll($)} />
+          <Text dimColor wrap="truncate-end">
+            {' '}
+            {layout.footer}
+          </Text>
         </Box>
-
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>คำสั่งล่าสุด</Text>
-          {commandList.length === 0 && <Text dimColor> ยังไม่มี</Text>}
-          {[...commandList].reverse().map(row => (
-            <Text dimColor={row.isDone && !row.isFailed}>
-              {' '}
-              {row.isDone ? (
-                row.isFailed ? (
-                  <Text color="red">✗</Text>
-                ) : (
-                  <Text color="green">✓</Text>
-                )
-              ) : (
-                <Text color="yellow">…</Text>
-              )}{' '}
-              {fit(row.command, width - 4)}
-            </Text>
-          ))}
-        </Box>
-
-        {checkList.length > 0 && (
-          <Box flexDirection="column" marginTop={1}>
-            <Text bold>ผล test / check</Text>
-            {[...checkList].reverse().map(check => (
-              <Text>
-                {' '}
-                {check.isPassed ? <Text color="green">✓ ผ่าน</Text> : <Text color="red">✗ พัง</Text>}{' '}
-                {fit(check.command, width - 16)} <Text dimColor>{clockTime(check.at)}</Text>
-              </Text>
-            ))}
-          </Box>
-        )}
-
-        {denyList.length > 0 && (
-          <Box flexDirection="column" marginTop={1}>
-            <Text bold>ถูกบล็อก ({denyList.length})</Text>
-            {[...denyList].reverse().map(deny => (
-              <Text>
-                {' '}
-                <Text color="red">⛔</Text> {fit(`${deny.tool}: ${deny.reason}`, width - 4)}
-              </Text>
-            ))}
-          </Box>
-        )}
-
-        {!isEmpty && (
-          <Box marginTop={1}>
-            <Button key="clear" label="ล้างรายการ" hotkey="c" onPress={() => clearAll($)} />
-          </Box>
-        )}
       </Box>
     )
   })

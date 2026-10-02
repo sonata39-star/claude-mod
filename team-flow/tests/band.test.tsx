@@ -1,4 +1,4 @@
-import { expect, test } from 'claude-code/testing'
+import { expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
@@ -126,5 +126,61 @@ test('shows a team agent while it runs', async ($, on) => {
   finish()
   await call
   expect(await ui.find({ type: 'Text', text: /กำลังทำงาน/ })).toBeUndefined()
+  await ui.unmount()
+})
+
+// A stand-in for dev-dashboard: it publishes whether its sidebar is docked.
+async function startSession($: Engine, on: On) {
+  mock.clock(on)
+  on('session.start', ($, e) => ({ cwd: e.cwd }))
+  on('command.register', ($, e) => ({ value: { command: e.name } }))
+  await $.session.start({ cwd: '/proj', surface: 'terminal', isInteractive: true })
+}
+
+test('steps aside while the dashboard sidebar is docked (it draws the pipeline there)', {
+  plugins: [
+    {
+      name: 'dev-dashboard',
+      register(on) {
+        on('session.start', async ($, e, next) => {
+          await $.state.set({ plugin: 'dev-dashboard', key: 'isDocked' }, true)
+
+          return next(e)
+        })
+      },
+    },
+  ],
+}, async ($, on) => {
+  project(on, true)
+  await startSession($, on)
+
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const ui = await $.ui.mount({ plugin: 'team-flow', surface, ...BAND })
+
+    expect(await ui.find({ type: 'Text', text: /Dev/ })).toBeUndefined()
+    expect(await ui.drawn()).toEqual({ type: 'engine', ref: 0 })
+    await ui.unmount()
+  }
+})
+
+test('shows the band again when the sidebar is not docked', {
+  plugins: [
+    {
+      name: 'dev-dashboard',
+      register(on) {
+        on('session.start', async ($, e, next) => {
+          await $.state.set({ plugin: 'dev-dashboard', key: 'isDocked' }, false)
+
+          return next(e)
+        })
+      },
+    },
+  ],
+}, async ($, on) => {
+  project(on, true)
+  await startSession($, on)
+
+  const ui = await $.ui.mount({ plugin: 'team-flow', surface: 'terminal', ...BAND })
+  expect(await ui.find({ type: 'Text', text: /Dev 1\/2/ })).toBeDefined()
   await ui.unmount()
 })

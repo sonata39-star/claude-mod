@@ -1,7 +1,27 @@
 {
   "name": "dev-dashboard",
   "version": "0.1.0",
-  "description": "A live pane of this session: files edited, recent commands, checks, denials, turns and usage",
+  "description": "A right-hand sidebar of this session: files edited, recent commands, checks and denials, as a menu of tabs",
   "author": { "name": "nata" },
-  "types": "./types/index.d.ts"
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "autoOpen": {
+      "type": "boolean",
+      "title": "Open the sidebar by itself",
+      "description": "Open the dashboard on the right when the screen is wide enough (it still hides on a narrow screen and comes back when it widens)",
+      "default": true
+    },
+    "minColumns": {
+      "type": "number",
+      "title": "Hide below this many columns",
+      "description": "The sidebar hides itself when the terminal is narrower than this, or not in the fullscreen layout",
+      "default": 120
+    },
+    "sidebarColumns": {
+      "type": "number",
+      "title": "Sidebar width",
+      "description": "Columns the sidebar asks for; 0 = about 28% of the screen, between 34 and 48",
+      "default": 0
+    }
+  }
 }

@@ -18,5 +18,10 @@ declare module 'claude-code' {
       running: TeamPhase[]
       isHidden: boolean
     }
+    // dev-dashboard's, read only: true while its right-hand sidebar is docked
+    // and shown, which then draws this pipeline; absent while not installed.
+    'dev-dashboard': {
+      isDocked: boolean
+    }
   }
 }

@@ -13,17 +13,16 @@ export type DashboardCheck = { command: string; isPassed: boolean; at: number }
 // The main loop's turns: how many, and their time together.
 export type DashboardTurns = { count: number; totalMs: number; lastMs: number }
 
-export type DashboardLimit = { kind: string; percentUsed: number; resetsAt?: string }
+// The menu's tabs, one list each.
+export type DashboardTab = 'files' | 'commands' | 'checks' | 'denies'
 
-// The session's figures as of `at` (ms since the epoch).
-export type DashboardUsage = {
-  at: number
-  contextPercent?: number
-  contextTokens?: number
-  window: number
-  costUsd?: number
-  limits: DashboardLimit[]
-}
+// What team-flow publishes in its own state, read here when it is installed
+// (the same shapes as team-flow's contract; this plugin never writes them).
+export type DashboardTeamPhase = 'pm' | 'ba' | 'lead' | 'dev' | 'review' | 'sec'
+
+export type DashboardTeamStep = { phase: DashboardTeamPhase; state: 'done' | 'active' | 'todo' | 'skip'; note?: string }
+
+export type DashboardTeamSnapshot = { slug: string; steps: DashboardTeamStep[]; isDone: boolean; others: number }
 
 declare module 'claude-code' {
   interface PluginState {
@@ -33,7 +32,19 @@ declare module 'claude-code' {
       denies: DashboardDeny[]
       checks: DashboardCheck[]
       turns: DashboardTurns
-      usage: DashboardUsage | null
+      tab: DashboardTab
+      // The person closed the sidebar: nothing reopens it this session but /dashboard.
+      isClosedByPerson: boolean
+      // The sidebar closed itself on a narrow screen and reopens when it widens.
+      isAutoHidden: boolean
+      // The person asked for it where it does not fit; it stays until they close it.
+      isAskedSmall: boolean
+      // The sidebar is docked and shown, so team-flow's band can step aside.
+      isDocked: boolean
+    }
+    'team-flow': {
+      snapshot: DashboardTeamSnapshot | null
+      running: DashboardTeamPhase[]
     }
   }
 }

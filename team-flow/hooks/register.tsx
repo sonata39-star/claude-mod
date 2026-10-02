@@ -8,6 +8,9 @@ import type { TeamFile } from './pipeline'
 const snapshotAtom = atom({ plugin: 'team-flow', key: 'snapshot' } as const, null)
 const runningAtom = atom({ plugin: 'team-flow', key: 'running' } as const, [])
 const isHiddenAtom = atom({ plugin: 'team-flow', key: 'isHidden' } as const, false)
+// dev-dashboard's sidebar draws the pipeline while it is docked; the band is
+// the fallback for every other time (small screen, closed, not installed).
+const isDashboardDocked = atom({ plugin: 'dev-dashboard', key: 'isDocked' } as const, false)
 
 const TEAM_PATH = /(^|\/)\.team\//
 
@@ -159,7 +162,7 @@ export const register: Register = on => {
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    if (e.props.hasSurvey || (await read($, isHiddenAtom))) {
+    if (e.props.hasSurvey || (await read($, isHiddenAtom)) || (await read($, isDashboardDocked))) {
       return next(e)
     }
 
