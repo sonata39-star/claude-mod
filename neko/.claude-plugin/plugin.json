@@ -1,6 +1,6 @@
 {
   "name": "neko",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "สัตว์ผู้ช่วย (Neko): แมว หมา นกฮูก วาฬ ฯลฯ นั่งเหนือช่องพิมพ์ คอยให้คำแนะนำระหว่างทำงาน และตอบคำถามผ่าน /neko",
   "author": {
     "name": "nata"
@@ -24,6 +24,16 @@
       "title": "Animate",
       "description": "ให้เหมียวกะพริบตา กระดิกหาง และมีหัวใจลอยตอนงานสำเร็จ",
       "default": true
+    },
+    "style": {
+      "type": "string",
+      "title": "Style",
+      "description": "หน้าตาใน terminal: pixel = ภาพพิกเซลแบบตัวมาสคอตของ Claude Code, ascii = วาดด้วยตัวอักษรแบบเดิม",
+      "options": [
+        "pixel",
+        "ascii"
+      ],
+      "default": "pixel"
     },
     "pet": {
       "type": "string",

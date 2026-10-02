@@ -1,5 +1,8 @@
 import { describe, expect, mock, test } from 'claude-code/testing'
+import type { Mounted } from 'claude-code/testing'
 import type { On } from 'claude-code'
+
+import { DARK, PETS } from '../hooks/pets'
 
 const USAGE = { input_tokens: 10, output_tokens: 10, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 }
 
@@ -24,6 +27,13 @@ const typed = (args: string) => ({
 })
 
 /** The engine beneath the plugins: an empty band, a quiet session. */
+/** The text of the art column, and its open eyes: full blocks in the dark eye colour. */
+type Band = Mounted<'terminal' | 'desktop', 'AbovePrompt'>
+const artOf = async (ui: Band) => (await ui.find({ key: 'art' }))?.text ?? ''
+const openEyes = async (ui: Band) =>
+  (await ui.findAll({ type: 'Text', text: '█' })).filter(one => one.props.color === DARK).length
+const BLOCKS = /[▀▄█]/
+
 const world = (on: On) => {
   mock.store(on)
   const clock = mock.clock(on, { now: 1_000 })
@@ -56,14 +66,33 @@ describe('band', () => {
     world(on)
     for (const surface of ['terminal', 'desktop'] as const) {
       const ui = await $.ui.mount({ plugin: 'neko', surface, ...band(100) })
-      expect(await ui.find({ type: 'Text', text: /\(=•ω•=\)/ })).toBeDefined()
-      expect(await ui.find({ type: 'Text', text: /ฅ\( {3}\)ฅ/ })).toBeDefined()
-      expect(await ui.find({ type: 'Text', text: /\("\)_\("\)/ })).toBeDefined()
       expect(await ui.find({ type: 'Text', text: /สวัสดีเหมียว/ })).toBeDefined()
       expect(await ui.find({ key: 'tip' })).toBeDefined()
       expect(await ui.find({ key: 'hide' })).toBeDefined()
       await ui.unmount()
     }
+  })
+
+  test('draws the cat in pixels on a terminal and in characters elsewhere', async ($, on) => {
+    world(on)
+    const terminal = await $.ui.mount({ plugin: 'neko', surface: 'terminal', ...band(100) })
+    expect(BLOCKS.test(await artOf(terminal))).toBe(true)
+    expect((await artOf(terminal)).includes('ω')).toBe(false)
+    expect(await openEyes(terminal)).toBe(2)
+    await terminal.unmount()
+
+    const desktop = await $.ui.mount({ plugin: 'neko', surface: 'desktop', ...band(100) })
+    expect(await desktop.find({ type: 'Text', text: /\(=•ω•=\)/ })).toBeDefined()
+    expect(await desktop.find({ type: 'Text', text: /ฅ\( {3}\)ฅ/ })).toBeDefined()
+    expect(await desktop.find({ type: 'Text', text: /\("\)_\("\)/ })).toBeDefined()
+    expect(BLOCKS.test(await artOf(desktop))).toBe(false)
+  })
+
+  test('style ascii keeps the characters on a terminal', { options: { style: 'ascii' } }, async ($, on) => {
+    world(on)
+    const ui = await $.ui.mount({ plugin: 'neko', surface: 'terminal', ...band(100) })
+    expect(await ui.find({ type: 'Text', text: /\(=•ω•=\)/ })).toBeDefined()
+    expect(BLOCKS.test(await artOf(ui))).toBe(false)
   })
 
   test('keeps the band of a plugin beneath it', { plugins: [otherBand] }, async ($, on) => {
@@ -80,6 +109,7 @@ describe('band', () => {
     world(on)
     const ui = await $.ui.mount({ plugin: 'neko', surface: 'terminal', ...band(40) })
     expect(await ui.find({ type: 'Text', text: '/\\_/\\' })).toBeUndefined()
+    expect(await ui.find({ key: 'art' })).toBeUndefined()
     expect(await ui.find({ type: 'Text', text: 'ฅ(=' })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /สวัสดีเหมียว/ })).toBeDefined()
   })
@@ -110,7 +140,7 @@ describe('advice', () => {
     expect(out.text).toContain('commit ก่อนแล้วค่อย refactor')
     expect(prompts[0]).toContain('ควรทำอะไรต่อ')
 
-    const ui = await $.ui.mount({ plugin: 'neko', surface: 'terminal', ...band(100) })
+    const ui = await $.ui.mount({ plugin: 'neko', surface: 'desktop', ...band(100) })
     expect(await ui.find({ type: 'Text', text: /commit ก่อนแล้วค่อย refactor/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /\(=\^ω\^=\)/ })).toBeDefined()
   })
@@ -146,7 +176,7 @@ describe('advice', () => {
     expect(asked).toHaveLength(1)
     expect(asked[0]).toContain('npm test')
 
-    const ui = await $.ui.mount({ plugin: 'neko', surface: 'terminal', ...band(100) })
+    const ui = await $.ui.mount({ plugin: 'neko', surface: 'desktop', ...band(100) })
     expect(await ui.find({ type: 'Text', text: 'อ่าน stack trace บรรทัดแรกก่อนแก้นะ' })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /\(=;ω;=\)/ })).toBeDefined()
   })
@@ -164,7 +194,7 @@ describe('advice', () => {
     await clock.advance(5)
 
     expect(calls).toBe(0)
-    const ui = await $.ui.mount({ plugin: 'neko', surface: 'terminal', ...band(100) })
+    const ui = await $.ui.mount({ plugin: 'neko', surface: 'desktop', ...band(100) })
     expect(await ui.find({ type: 'Text', text: /\(=\^ω\^=\)/ })).toBeDefined()
   })
 
@@ -196,7 +226,7 @@ describe('looks', () => {
       seen.push((await looks.find?.(/ฅ\( ⌕ \)ฅ/)) === true)
       return { result: { stdout: 'ok', stderr: '', interrupted: false } }
     })
-    const ui = await $.ui.mount({ plugin: 'neko', surface: 'terminal', ...band(100) })
+    const ui = await $.ui.mount({ plugin: 'neko', surface: 'desktop', ...band(100) })
     looks.find = async text => (await ui.find({ type: 'Text', text })) !== undefined
 
     await $.tool.call({ tool: 'Bash', command: 'npm test' })
@@ -204,6 +234,26 @@ describe('looks', () => {
     expect(seen).toEqual([true, true])
     expect(await ui.find({ type: 'Text', text: /กำลังส่อง test/ })).toBeUndefined()
     expect(await ui.find({ type: 'Text', text: /ฅ\( {3}\)ฅ/ })).toBeDefined()
+  })
+
+  test('in pixels it holds the magnifier in its paws', async ($, on) => {
+    world(on)
+    const held: (string | undefined)[] = []
+    const looks: { find?: () => Promise<string | undefined> } = {}
+    on('tool.call', { tool: 'Bash' }, async () => {
+      held.push(await looks.find?.())
+      return { result: { stdout: 'ok', stderr: '', interrupted: false } }
+    })
+    const ui = await $.ui.mount({ plugin: 'neko', surface: 'terminal', ...band(100) })
+    looks.find = async () => {
+      const glyph = (await ui.findAll({ type: 'Text', text: '⌕' })).find(one => one.text === '⌕')
+      return glyph === undefined ? undefined : String(glyph.props.backgroundColor)
+    }
+
+    await $.tool.call({ tool: 'Bash', command: 'npm test' })
+
+    expect(held).toEqual([PETS.cat.sprite.colors.w])
+    expect(await ui.find({ type: 'Text', text: '⌕' })).toBeUndefined()
   })
 
   test('a good turn floats a heart up beside the cat, then it is gone', async ($, on) => {
@@ -226,7 +276,7 @@ describe('looks', () => {
     on('session.start', (_$, e) => ({ cwd: e.cwd }))
     await $.session.start({ cwd: '/work', surface: 'terminal', isInteractive: true })
 
-    const ui = await $.ui.mount({ plugin: 'neko', surface: 'terminal', ...band(100) })
+    const ui = await $.ui.mount({ plugin: 'neko', surface: 'desktop', ...band(100) })
     expect(await ui.find({ type: 'Text', text: /\("\)_\("\) ~/ })).toBeDefined()
 
     await clock.advance(3_500)
@@ -239,13 +289,44 @@ describe('looks', () => {
     expect(await ui.find({ type: 'Text', text: /\(=•ω•=\)/ })).toBeDefined()
   })
 
-  test('stays still with animate off', { options: { animate: false } }, async ($, on) => {
+  test('in pixels it blinks and swings its tail too', async ($, on) => {
     const clock = world(on)
     on('command.register', (_$, e) => ({ value: { command: e.name } }))
     on('session.start', (_$, e) => ({ cwd: e.cwd }))
     await $.session.start({ cwd: '/work', surface: 'terminal', isInteractive: true })
 
     const ui = await $.ui.mount({ plugin: 'neko', surface: 'terminal', ...band(100) })
+    const first = await artOf(ui)
+    expect(await openEyes(ui)).toBe(2)
+
+    await clock.advance(3_500)
+    expect((await artOf(ui)) === first).toBe(false)
+    expect(await openEyes(ui)).toBe(2)
+
+    await clock.advance(3_500)
+    expect(await openEyes(ui)).toBe(0)
+    await clock.advance(300)
+    expect(await openEyes(ui)).toBe(2)
+  })
+
+  test('a happy cat smiles in pixels: the top half of each eye, in green', async ($, on) => {
+    world(on)
+    await $.turn.start({ text: 'hi', turnId: 't1' })
+    await $.turn.complete({ answer: 'done', durationMs: 1_000, isAborted: false, turnId: 't1', reason: 'answer' })
+
+    const ui = await $.ui.mount({ plugin: 'neko', surface: 'terminal', ...band(100) })
+    const smiles = (await ui.findAll({ type: 'Text', text: '▀' })).filter(one => one.props.color === 'green')
+    expect(smiles).toHaveLength(2)
+    expect(smiles[0]?.props.backgroundColor).toBe(PETS.cat.sprite.colors.b)
+  })
+
+  test('stays still with animate off', { options: { animate: false } }, async ($, on) => {
+    const clock = world(on)
+    on('command.register', (_$, e) => ({ value: { command: e.name } }))
+    on('session.start', (_$, e) => ({ cwd: e.cwd }))
+    await $.session.start({ cwd: '/work', surface: 'terminal', isInteractive: true })
+
+    const ui = await $.ui.mount({ plugin: 'neko', surface: 'desktop', ...band(100) })
     await clock.advance(7_000)
     expect(await ui.find({ type: 'Text', text: /\("\)_\("\) ~/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /\(=-ω-=\)/ })).toBeUndefined()
@@ -272,7 +353,7 @@ describe('pets', () => {
 
     const dog = await $.command.run(typed('pet dog'))
     expect(dog.text).toContain('โฮ่งมาแล้ว')
-    const ui = await $.ui.mount({ plugin: 'neko', surface: 'terminal', ...band(100) })
+    const ui = await $.ui.mount({ plugin: 'neko', surface: 'desktop', ...band(100) })
     expect(await ui.find({ type: 'Text', text: /U\(\^ᴥ\^\)U/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: 'โฮ่ง' })).toBeDefined()
 
@@ -287,7 +368,7 @@ describe('pets', () => {
     started(on)
     await $.session.start({ cwd: '/work', surface: 'terminal', isInteractive: true })
 
-    const ui = await $.ui.mount({ plugin: 'neko', surface: 'terminal', ...band(100) })
+    const ui = await $.ui.mount({ plugin: 'neko', surface: 'desktop', ...band(100) })
     expect(await ui.find({ type: 'Text', text: /\( O,O \)/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: 'ฮูก' })).toBeDefined()
   })
@@ -297,7 +378,7 @@ describe('pets', () => {
     await $.session.start({ cwd: '/work', surface: 'terminal', isInteractive: true })
     await $.command.run(typed('pet หมาป่า'))
 
-    const ui = await $.ui.mount({ plugin: 'neko', surface: 'terminal', ...band(100) })
+    const ui = await $.ui.mount({ plugin: 'neko', surface: 'desktop', ...band(100) })
     expect(await ui.find({ type: 'Text', text: /႔ ႔ {7}⸝ {4},/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /ᠸ\^ \^ {3}𐅠 {3}\/ {4}ʃ/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /\| {5}\\ {3}꠹ {4}ʃ/ })).toBeDefined()
@@ -313,6 +394,8 @@ describe('pets', () => {
       for (const surface of ['terminal', 'desktop'] as const) {
         const ui = await $.ui.mount({ plugin: 'neko', surface, ...band(100) })
         expect(await ui.find({ key: 'tip' })).toBeDefined()
+        expect((await ui.find({ key: 'art' }))?.children).toHaveLength(4)
+        expect(BLOCKS.test(await artOf(ui))).toBe(surface === 'terminal')
         await ui.unmount()
       }
     }

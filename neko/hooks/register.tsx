@@ -2,8 +2,21 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderElement } from 'claude-code'
 
 import type { NekoAction, NekoMood, NekoPet } from '../types'
-import { artWidth, eyeOf, findPet, miniFace, PET_IDS, PETS, pieces, widthOf } from './pets'
-import type { Pet } from './pets'
+import {
+  artWidth,
+  eyeOf,
+  eyeShape,
+  findPet,
+  miniFace,
+  PET_IDS,
+  PETS,
+  pieces,
+  spriteFaceRow,
+  spriteRows,
+  spriteWidth,
+  widthOf,
+} from './pets'
+import type { Cell, Pet } from './pets'
 
 const line = atom({ plugin: 'neko', key: 'line' } as const, null)
 const mood = atom({ plugin: 'neko', key: 'mood' } as const, 'idle')
@@ -125,6 +138,7 @@ const newTurn = (): TurnStats => ({
 const memo = {
   autoTips: true,
   animate: true,
+  isPixel: true,
   ticks: 0,
   actionToken: 0,
   tipModel: HAIKU,
@@ -401,6 +415,7 @@ export const register: Register = (on, options) => {
   memo.autoTips = options.autoTips !== false
   memo.tipModel = typeof options.tipModel === 'string' && options.tipModel.length > 0 ? options.tipModel : HAIKU
   memo.animate = options.animate !== false
+  memo.isPixel = options.style !== 'ascii'
   const chosen = petOption(options.pet)
 
   on('session.start', async ($, e, next) => {
@@ -606,8 +621,11 @@ export const register: Register = (on, options) => {
     const label = holding === null ? MOOD_LABEL[current] : ACTION_LABEL[holding]
     const held = holding === null ? ' ' : HELD[holding]
     const wag = p.tails[memo.animate ? swing % 2 : 0] ?? ''
-    const width = artWidth(p)
     const columns = e.props.bodyColumns
+    // A terminal draws the pet in pixels; another surface, or style ascii, in characters.
+    const sprite = memo.isPixel && e.surface === 'terminal' ? p.sprite : undefined
+    const width = sprite === undefined ? artWidth(p) : spriteWidth(sprite)
+    const faceRow = sprite === undefined ? (p.faceRow ?? 1) : spriteFaceRow(sprite)
 
     const { Box, Button, Text } = $.ui.resolve(e)
 
@@ -615,7 +633,7 @@ export const register: Register = (on, options) => {
     const beside = (row: number): RenderElement | string =>
       float >= 0 ? (
         3 - float === row ? <Text color={SPARKLE}>{float === 1 ? '♪' : '♡'}</Text> : ''
-      ) : row === (p.faceRow ?? 1) ? (
+      ) : row === faceRow ? (
         <Text color={tint}>{MOOD_MARK[current]}</Text>
       ) : (
         ''
@@ -645,6 +663,26 @@ export const register: Register = (on, options) => {
       )
     }
 
+    // One row of the sprite: runs of half blocks, then the column beside it.
+    const drawPixels = (runs: readonly Cell[], row: number): RenderElement => (
+      <Text>
+        {runs.map(run => (
+          <Text color={run.color} backgroundColor={run.backgroundColor} bold={run.bold}>
+            {run.text}
+          </Text>
+        ))}
+        {'  '}
+        {beside(row)}
+      </Text>
+    )
+
+    const art =
+      sprite === undefined
+        ? p.rows.map((template, row) => drawRow(template, row))
+        : spriteRows(sprite, tint, eyeShape(eye), memo.animate ? swing : 0, holding === null ? undefined : HELD[holding]).map(
+            (runs, row) => drawPixels(runs, row),
+          )
+
     const mine: RenderElement =
       columns < 60 ? (
         <Box key="neko" flexDirection="row" gap={1}>
@@ -657,8 +695,8 @@ export const register: Register = (on, options) => {
         </Box>
       ) : (
         <Box key="neko" flexDirection="row" gap={1}>
-          <Box flexDirection="column" width={width + 5} flexShrink={0}>
-            {p.rows.map((template, row) => drawRow(template, row))}
+          <Box key="art" flexDirection="column" width={width + 5} flexShrink={0}>
+            {art}
           </Box>
           <Box flexDirection="column" width={Math.max(20, columns - width - 6)}>
             <Text>

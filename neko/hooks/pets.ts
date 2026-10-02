@@ -21,6 +21,21 @@ export type Pet = {
   tails: readonly [string, string]
   // Eyes it draws in place of the shared ones for some moods.
   eyes?: Partial<Record<NekoMood, string>>
+  // How it looks in pixels on a terminal.
+  sprite: Sprite
+}
+
+// A pet in pixels, two to a terminal cell, drawn with ▀ ▄ █ and a background
+// colour the way Claude Code's own mascot is.
+export type Sprite = {
+  // Eight rows: '.' is empty, 'e' an eye (both pixels of one cell), 't' and
+  // 'u' the tail on either swing, any other letter a colour of `colors`.
+  pixels: readonly [string, string, string, string, string, string, string, string]
+  // 'b' is the body. 's' shows round a shut eye and 't' is the tail, both 'b'
+  // when left out.
+  colors: Readonly<Record<string, string>>
+  // The cell [column, row] that shows what it holds while Claude works.
+  hold: readonly [number, number]
 }
 
 export const PETS: Record<NekoPet, Pet> = {
@@ -32,6 +47,20 @@ export const PETS: Record<NekoPet, Pet> = {
     rows: ['   /\\_/\\', '  (={L}ω{R}=)', '  ฅ( {H} )ฅ', '  (")_(") {T}'],
     mini: 'ฅ(={L}ω{R}=)ฅ',
     tails: ['~', 'ʃ'],
+    sprite: {
+      pixels: [
+        '.b.....b......',
+        '.ab...ba....t.',
+        'bbebbbebb..t.t',
+        'bbebbbebb..t..',
+        'bbbbabbbb..t..',
+        '.bbbbbbb...t..',
+        '.bwwwwwbb.t..u',
+        'bbwwwwwbbbuuu.',
+      ],
+      colors: { b: '#ff8fb8', a: '#ff5f87', w: '#ffe0ec' },
+      hold: [4, 3],
+    },
   },
   dog: {
     call: 'โฮ่ง',
@@ -41,6 +70,20 @@ export const PETS: Record<NekoPet, Pet> = {
     rows: ['   .---.', '  U({L}ᴥ{R})U', '  ฅ( {H} )ฅ', '  (")_(") {T}'],
     mini: 'U({L}ᴥ{R})U',
     tails: ['⌒', '~'],
+    sprite: {
+      pixels: [
+        '.aabbbbbaa....',
+        'aabbbbbbbaa...',
+        'aabebbbebaa...',
+        'a.bebbbeb.a...',
+        '..bwwdwwb...t.',
+        '..bbwwwbb..t..',
+        '.bbwwwwwbbbuu.',
+        '.bwwbbbwwb....',
+      ],
+      colors: { b: '#d7af87', a: '#8a5a3c', w: '#f5e6d3', d: '#3a2a1a' },
+      hold: [5, 3],
+    },
   },
   wolf: {
     call: 'หมาป่า',
@@ -54,6 +97,20 @@ export const PETS: Record<NekoPet, Pet> = {
     mini: 'ʌ({L}ᴥ{R})ʌ',
     tails: ['ʃ', '~'],
     eyes: { idle: '-' },
+    sprite: {
+      pixels: [
+        'b.......b.....',
+        'bb.....bb.....',
+        'babbbbbab..tt.',
+        'bebbbbbeb.tt..',
+        'bebbbbbeb.tt..',
+        'wwbbdbbww.t...',
+        '.bwwwwwbbt.uuu',
+        '.bwwwwwbbbuuu.',
+      ],
+      colors: { b: '#a8a8a8', w: '#e8e8e8', d: '#3a3a3a', a: '#6c6c6c' },
+      hold: [4, 3],
+    },
   },
   bird: {
     call: 'จิ๊บ',
@@ -63,6 +120,20 @@ export const PETS: Record<NekoPet, Pet> = {
     rows: ['    \\|/', '   ({L}v{R})', '  ʚ( {H} )ɞ', '    ᴧ ᴧ {T}'],
     mini: 'ʚ({L}v{R})ɞ',
     tails: ['♪', ' '],
+    sprite: {
+      pixels: [
+        '....bb......',
+        '..bbbbbb....',
+        '.bbebbebb...',
+        '.bbebbebb...',
+        '.bbbaabbb...',
+        'dbbwwwwbbdt.',
+        '.bbwwwwbb.tu',
+        '..awwwwa..u.',
+      ],
+      colors: { b: '#87d7ff', a: '#ffaf00', w: '#e4f6ff', d: '#5fafd7' },
+      hold: [5, 3],
+    },
   },
   owl: {
     call: 'ฮูก',
@@ -73,6 +144,20 @@ export const PETS: Record<NekoPet, Pet> = {
     mini: '({L},{R})',
     tails: [' ', '·'],
     eyes: { idle: 'O', thinking: 'O' },
+    sprite: {
+      pixels: [
+        '.b.......b.',
+        '.bbbbbbbbb.',
+        '.bwewbwewb.',
+        '.bwewbwewb.',
+        '.dbbbabbbd.',
+        'ddbwwwwwbdd',
+        '.dbwwwwwbd.',
+        'ggggagagggg',
+      ],
+      colors: { b: '#d7875f', a: '#ffaf00', w: '#f5deb3', d: '#af5f3f', s: '#f5deb3', g: '#5f3f1f' },
+      hold: [5, 3],
+    },
   },
   fish: {
     call: 'ปลาน้อย',
@@ -82,6 +167,20 @@ export const PETS: Record<NekoPet, Pet> = {
     rows: ['        o', '       ° {H}', '  {T}((({L}>', ' ~~~~~~~~~~'],
     mini: '><((({L}>',
     tails: ['><', '>-'],
+    sprite: {
+      pixels: [
+        '............c.',
+        '......aaa..c..',
+        'tt..bbwbbebb..',
+        '.tbbbbwbbebbb.',
+        'uubbbbwbbbbbbb',
+        '.tbbbbwbbbbaa.',
+        'tt..bbwbbbb...',
+        '......aa......',
+      ],
+      colors: { b: '#ffaf5f', a: '#ff8700', w: '#ffffff', c: '#87d7ff' },
+      hold: [7, 2],
+    },
   },
   whale: {
     call: 'วาฬ',
@@ -91,6 +190,20 @@ export const PETS: Record<NekoPet, Pet> = {
     rows: ['     {T}', '  .-~~~~~-.', ' (  {L}  {H}  )=<', '  `-.___.-´'],
     mini: '( {L} )=<',
     tails: [',:,', '.:.'],
+    sprite: {
+      pixels: [
+        '..t.t...........',
+        '...t..u.........',
+        '..bbbbbbb.......',
+        '.bbbbbbbbbb...bb',
+        'bbebbbbbbbbbbbb.',
+        'bbebbbbbbbbbbb..',
+        'wwwwwwwwbbbb....',
+        '.wwwwwwww.......',
+      ],
+      colors: { b: '#5f87ff', w: '#c8d7ff', t: '#87d7ff' },
+      hold: [6, 2],
+    },
   },
   shark: {
     call: 'ฉลาม',
@@ -100,6 +213,20 @@ export const PETS: Record<NekoPet, Pet> = {
     rows: ['      /|', '  ___/_|___', ' /{L}  {H}  ≡ \\{T}', ' \\vvvv_____/'],
     mini: '/({L}≡)>',
     tails: ['<', '/'],
+    sprite: {
+      pixels: [
+        '........b......t',
+        '.......bb.....tu',
+        '...bbbbbbbbb.bb.',
+        '.bbbbbbbbbbbbb..',
+        'bbebbbbbbbbbbb..',
+        'bbebbbbbbbbbbbb.',
+        'wdwdwwwwwbbb..tu',
+        '.wwwwwwww......t',
+      ],
+      colors: { b: '#87afaf', w: '#eef4f4', d: '#3a4a4a' },
+      hold: [7, 2],
+    },
   },
   elephant: {
     call: 'ช้างน้อย',
@@ -109,6 +236,20 @@ export const PETS: Record<NekoPet, Pet> = {
     rows: ['   _.-._', ' (( {L}ʃ{R} ))', '  ∩( {H} )∩', '  (_)─(_) {T}'],
     mini: '(({L}ʃ{R}))',
     tails: ['~', 'ʃ'],
+    sprite: {
+      pixels: [
+        '..bbbbbbb.....',
+        'bbbbbbbbbbb...',
+        'babebbbebab...',
+        'babebbbebab...',
+        'bab.bbb.bab...',
+        '.bb.wbw.bb..t.',
+        '....bbbbbbbt.u',
+        '...bb..bbbbbuu',
+      ],
+      colors: { b: '#b2b2b2', a: '#ffafaf', w: '#ffffff' },
+      hold: [7, 3],
+    },
   },
   horse: {
     call: 'ม้า',
@@ -118,6 +259,20 @@ export const PETS: Record<NekoPet, Pet> = {
     rows: ['   /\\ /\\', '  /({L}ᴗ{R})\\', '  ∩( {H} )∩', '  (_)─(_) {T}'],
     mini: '/({L}ᴗ{R})\\',
     tails: ['ʃ', '~'],
+    sprite: {
+      pixels: [
+        '..b...........',
+        '.bbaa.........',
+        'bbebaa........',
+        'bbebbaa.....t.',
+        'wbb..bbbbbbbt.',
+        'ww...bbbbbbbbu',
+        '.....bb...bbtu',
+        '.....dd...dd..',
+      ],
+      colors: { b: '#af875f', a: '#5f3f1f', w: '#e0c8a8', d: '#3a2a1a' },
+      hold: [8, 2],
+    },
   },
   cow: {
     call: 'วัว',
@@ -126,6 +281,20 @@ export const PETS: Record<NekoPet, Pet> = {
     rows: ['   ^____^', '  ({L}(oo){R})', '  ∩( {H} )∩', '  (_)─(_) {T}'],
     mini: '^({L}(oo){R})^',
     tails: ['~', 'ʃ'],
+    sprite: {
+      pixels: [
+        'w.......w....',
+        'bbddbbbbbb...',
+        'bebdbbbebb...',
+        'bebbbbbebb...',
+        '.aaaaaaaa..t.',
+        '.adaaaada.t.u',
+        '.bbddbbbbbuu.',
+        '.bb.bb.bb....',
+      ],
+      colors: { b: '#e4e4e4', a: '#ffafaf', w: '#ffe4b5', d: '#303030' },
+      hold: [5, 3],
+    },
   },
 }
 
@@ -204,4 +373,95 @@ export function miniFace(pet: Pet, mood: NekoMood): string {
   return pieces(pet.mini, eyeOf(pet, mood, false), ' ', '')
     .map(part => part.text)
     .join('')
+}
+
+// The eyes' colour where neither the mood nor the sprite gives one, and the
+// colour of what a sprite holds.
+export const DARK = '#1c1c1c'
+
+// What the eye glyph a mood draws becomes in pixels: '-' and 'ᴗ' are shut (the
+// cell's bottom half), '^' smiles (its top half), the rest stay open.
+export type EyeShape = 'open' | 'shut' | 'smile'
+
+export function eyeShape(eye: string): EyeShape {
+  return eye === '-' || eye === 'ᴗ' ? 'shut' : eye === '^' ? 'smile' : 'open'
+}
+
+// One run of a sprite's row: cells that share their colours.
+export type Cell = { text: string; color?: string; backgroundColor?: string; bold?: boolean }
+
+export function spriteWidth(sprite: Sprite): number {
+  return Math.max(...sprite.pixels.map(row => row.length))
+}
+
+// The terminal row its eyes are on.
+export function spriteFaceRow(sprite: Sprite): number {
+  return Math.floor(Math.max(0, sprite.pixels.findIndex(row => row.includes('e'))) / 2)
+}
+
+// The colour of one pixel, or undefined where it is empty.
+function pixel(sprite: Sprite, x: number, y: number, eye: string | undefined, shape: EyeShape, swing: number): string | undefined {
+  const { colors } = sprite
+  const body = colors.b
+  const ch = sprite.pixels[y]?.[x] ?? '.'
+  if (ch === '.') {
+    return undefined
+  }
+  if (ch === 't' || ch === 'u') {
+    return ch === (swing % 2 === 0 ? 't' : 'u') ? (colors.t ?? body) : undefined
+  }
+  if (ch === 'e') {
+    const isTop = y % 2 === 0
+    const isLit = shape === 'open' || (shape === 'shut' ? !isTop : isTop)
+
+    return isLit ? (eye ?? DARK) : (colors.s ?? body)
+  }
+
+  return colors[ch] ?? body
+}
+
+// Two stacked pixels as one cell: the upper half block in the top's colour
+// over the bottom's as background.
+function cellOf(top: string | undefined, bottom: string | undefined): Cell {
+  if (top === undefined) {
+    return bottom === undefined ? { text: ' ' } : { text: '▄', color: bottom }
+  }
+  if (bottom === undefined) {
+    return { text: '▀', color: top }
+  }
+
+  return top === bottom ? { text: '█', color: top } : { text: '▀', color: top, backgroundColor: bottom }
+}
+
+// The sprite's four terminal rows, each a list of runs. `eye` colours the
+// eyes (DARK when undefined), `swing` picks the tail, and `held`, when given,
+// shows in the hold cell.
+export function spriteRows(sprite: Sprite, eye: string | undefined, shape: EyeShape, swing: number, held?: string): Cell[][] {
+  const width = spriteWidth(sprite)
+  const [holdX, holdRow] = sprite.hold
+
+  return [0, 1, 2, 3].map(row => {
+    const runs: Cell[] = []
+    for (let x = 0; x < width; x++) {
+      const top = pixel(sprite, x, row * 2, eye, shape, swing)
+      const bottom = pixel(sprite, x, row * 2 + 1, eye, shape, swing)
+      const cell =
+        held !== undefined && x === holdX && row === holdRow
+          ? { text: held, color: DARK, backgroundColor: top ?? bottom, bold: true }
+          : cellOf(top, bottom)
+      const last = runs[runs.length - 1]
+      if (
+        last !== undefined &&
+        last.color === cell.color &&
+        last.backgroundColor === cell.backgroundColor &&
+        last.bold === cell.bold
+      ) {
+        last.text += cell.text
+      } else {
+        runs.push(cell)
+      }
+    }
+
+    return runs
+  })
 }
