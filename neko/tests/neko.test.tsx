@@ -292,15 +292,16 @@ describe('pets', () => {
     expect(await ui.find({ type: 'Text', text: 'ฮูก' })).toBeDefined()
   })
 
-  test("the wolf is the person's own drawing, eyes by mood and woof", async ($, on) => {
+  test("the wolf is the person's own drawing, eyes by mood and a curled tail", async ($, on) => {
     started(on)
     await $.session.start({ cwd: '/work', surface: 'terminal', isInteractive: true })
     await $.command.run(typed('pet หมาป่า'))
 
     const ui = await $.ui.mount({ plugin: 'neko', surface: 'terminal', ...band(100) })
     expect(await ui.find({ type: 'Text', text: /႔ ႔ {7}⸝ {4},/ })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: /ᠸ\^ \^ {3}𐅠 {3}\/ {4}މ {3}woof/ })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: /\| {5}\\ {3}꠹ {4}މ/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /ᠸ\^ \^ {3}𐅠 {3}\/ {4}ʃ/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /\| {5}\\ {3}꠹ {4}ʃ/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /woof|މ/ })).toBeUndefined()
   })
 
   test('every companion draws four rows on every surface', async ($, on) => {

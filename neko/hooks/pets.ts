@@ -2,7 +2,7 @@ import type { NekoMood, NekoPet } from '../types'
 
 // The companions the band can draw. Each is four rows of a template in which
 // {L} and {R} are the eyes, {H} what it holds while Claude works and {T} its
-// tail (or spout, or what it says), swung by the idle animation. Widths are
+// tail (or spout), swung by the idle animation. Widths are
 // counted per cell (cellWidth), so a combining mark takes none.
 export type Pet = {
   // Its name in the bubble's title and in what it says.
@@ -49,10 +49,10 @@ export const PETS: Record<NekoPet, Pet> = {
     color: '#a8a8a8',
     // The person's own drawing. The Thaana sukun leading the face row is a
     // combining mark: the space before it gives it something to sit on.
-    rows: ['', '    ႔ ႔       ⸝    ,', ' ްᠸ{L} {R}   𐅠   /    މ   {T}', '   |  {H}  \\   ꠹    މ'],
+    rows: ['', '    ႔ ႔       ⸝    ,', ' ްᠸ{L} {R}   𐅠   /    {T}', '   |  {H}  \\   ꠹    ʃ'],
     faceRow: 2,
     mini: 'ʌ({L}ᴥ{R})ʌ',
-    tails: ['woof...', 'woof.. '],
+    tails: ['ʃ', '~'],
     eyes: { idle: '-' },
   },
   bird: {
