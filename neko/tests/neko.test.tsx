@@ -56,8 +56,9 @@ describe('band', () => {
     world(on)
     for (const surface of ['terminal', 'desktop'] as const) {
       const ui = await $.ui.mount({ plugin: 'neko', surface, ...band(100) })
-      expect(await ui.find({ type: 'Text', text: '•ω•' })).toBeDefined()
-      expect(await ui.find({ type: 'Text', text: /ฅ {3}ฅ/ })).toBeDefined()
+      expect(await ui.find({ type: 'Text', text: /\(=•ω•=\)/ })).toBeDefined()
+      expect(await ui.find({ type: 'Text', text: /ฅ\( {3}\)ฅ/ })).toBeDefined()
+      expect(await ui.find({ type: 'Text', text: /\("\)_\("\)/ })).toBeDefined()
       expect(await ui.find({ type: 'Text', text: /สวัสดีเหมียว/ })).toBeDefined()
       expect(await ui.find({ key: 'tip' })).toBeDefined()
       expect(await ui.find({ key: 'hide' })).toBeDefined()
@@ -111,7 +112,7 @@ describe('advice', () => {
 
     const ui = await $.ui.mount({ plugin: 'neko', surface: 'terminal', ...band(100) })
     expect(await ui.find({ type: 'Text', text: /commit ก่อนแล้วค่อย refactor/ })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: '^ω^' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /\(=\^ω\^=\)/ })).toBeDefined()
   })
 
   test('falls back to the tip model when there is nothing to fork', { options: { tipModel: 'haiku' } }, async ($, on) => {
@@ -147,7 +148,7 @@ describe('advice', () => {
 
     const ui = await $.ui.mount({ plugin: 'neko', surface: 'terminal', ...band(100) })
     expect(await ui.find({ type: 'Text', text: 'อ่าน stack trace บรรทัดแรกก่อนแก้นะ' })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: ';ω;' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /\(=;ω;=\)/ })).toBeDefined()
   })
 
   test('a quiet, short turn makes no model call', { options: { autoTips: true } }, async ($, on) => {
@@ -164,7 +165,7 @@ describe('advice', () => {
 
     expect(calls).toBe(0)
     const ui = await $.ui.mount({ plugin: 'neko', surface: 'terminal', ...band(100) })
-    expect(await ui.find({ type: 'Text', text: '^ω^' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /\(=\^ω\^=\)/ })).toBeDefined()
   })
 
   test('autoTips off makes no model call even after a failure', { options: { autoTips: false } }, async ($, on) => {
@@ -192,7 +193,7 @@ describe('looks', () => {
     const looks: { find?: (text: RegExp) => Promise<boolean> } = {}
     on('tool.call', { tool: 'Bash' }, async () => {
       seen.push((await looks.find?.(/กำลังส่อง test/)) === true)
-      seen.push((await looks.find?.(/ฅ ⌕ ฅ/)) === true)
+      seen.push((await looks.find?.(/ฅ\( ⌕ \)ฅ/)) === true)
       return { result: { stdout: 'ok', stderr: '', interrupted: false } }
     })
     const ui = await $.ui.mount({ plugin: 'neko', surface: 'terminal', ...band(100) })
@@ -202,7 +203,7 @@ describe('looks', () => {
 
     expect(seen).toEqual([true, true])
     expect(await ui.find({ type: 'Text', text: /กำลังส่อง test/ })).toBeUndefined()
-    expect(await ui.find({ type: 'Text', text: /ฅ {3}ฅ/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /ฅ\( {3}\)ฅ/ })).toBeDefined()
   })
 
   test('a good turn floats a heart up beside the cat, then it is gone', async ($, on) => {
@@ -226,16 +227,16 @@ describe('looks', () => {
     await $.session.start({ cwd: '/work', surface: 'terminal', isInteractive: true })
 
     const ui = await $.ui.mount({ plugin: 'neko', surface: 'terminal', ...band(100) })
-    expect(await ui.find({ type: 'Text', text: /ฅ {3}ฅ ~/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /\("\)_\("\) ~/ })).toBeDefined()
 
     await clock.advance(3_500)
-    expect(await ui.find({ type: 'Text', text: /ฅ {3}ฅ ʃ/ })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: '•ω•' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /\("\)_\("\) ʃ/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /\(=•ω•=\)/ })).toBeDefined()
 
     await clock.advance(3_500)
-    expect(await ui.find({ type: 'Text', text: '-ω-' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /\(=-ω-=\)/ })).toBeDefined()
     await clock.advance(300)
-    expect(await ui.find({ type: 'Text', text: '•ω•' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /\(=•ω•=\)/ })).toBeDefined()
   })
 
   test('stays still with animate off', { options: { animate: false } }, async ($, on) => {
@@ -246,7 +247,73 @@ describe('looks', () => {
 
     const ui = await $.ui.mount({ plugin: 'neko', surface: 'terminal', ...band(100) })
     await clock.advance(7_000)
-    expect(await ui.find({ type: 'Text', text: /ฅ {3}ฅ ~/ })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: '-ω-' })).toBeUndefined()
+    expect(await ui.find({ type: 'Text', text: /\("\)_\("\) ~/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /\(=-ω-=\)/ })).toBeUndefined()
+  })
+})
+
+describe('pets', () => {
+  const started = (on: On) => {
+    const clock = world(on)
+    on('command.register', (_$, e) => ({ value: { command: e.name } }))
+    on('session.start', (_$, e) => ({ cwd: e.cwd }))
+
+    return clock
+  }
+
+  test('/neko pet lists every companion and switches by English or Thai name', async ($, on) => {
+    started(on)
+    await $.session.start({ cwd: '/work', surface: 'terminal', isInteractive: true })
+
+    const list = await $.command.run(typed('pet'))
+    for (const face of ['ฅ(=•ω•=)ฅ', 'U(•ᴥ•)U', '(O,O)', '><(((•>', '((•ʃ•))']) {
+      expect(list.text).toContain(face)
+    }
+
+    const dog = await $.command.run(typed('pet dog'))
+    expect(dog.text).toContain('โฮ่งมาแล้ว')
+    const ui = await $.ui.mount({ plugin: 'neko', surface: 'terminal', ...band(100) })
+    expect(await ui.find({ type: 'Text', text: /U\(\^ᴥ\^\)U/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: 'โฮ่ง' })).toBeDefined()
+
+    await $.command.run(typed('pet ปลาวาฬ'))
+    expect(await ui.find({ type: 'Text', text: /\.-~~~~~-\./ })).toBeDefined()
+
+    const unknown = await $.command.run(typed('pet dragon'))
+    expect(unknown.text).toContain('ไม่รู้จัก')
+  })
+
+  test('the pet option picks the companion, owl eyes and all', { options: { pet: 'owl' } }, async ($, on) => {
+    started(on)
+    await $.session.start({ cwd: '/work', surface: 'terminal', isInteractive: true })
+
+    const ui = await $.ui.mount({ plugin: 'neko', surface: 'terminal', ...band(100) })
+    expect(await ui.find({ type: 'Text', text: /\( O,O \)/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: 'ฮูก' })).toBeDefined()
+  })
+
+  test("the wolf is the person's own drawing, eyes by mood and woof", async ($, on) => {
+    started(on)
+    await $.session.start({ cwd: '/work', surface: 'terminal', isInteractive: true })
+    await $.command.run(typed('pet หมาป่า'))
+
+    const ui = await $.ui.mount({ plugin: 'neko', surface: 'terminal', ...band(100) })
+    expect(await ui.find({ type: 'Text', text: /႔ ႔ {7}⸝ {4},/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /ᠸ\^ \^ {3}𐅠 {3}\/ {4}މ {3}woof/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /\| {5}\\ {3}꠹ {4}މ/ })).toBeDefined()
+  })
+
+  test('every companion draws four rows on every surface', async ($, on) => {
+    started(on)
+    await $.session.start({ cwd: '/work', surface: 'terminal', isInteractive: true })
+
+    for (const id of ['cat', 'dog', 'wolf', 'bird', 'owl', 'fish', 'whale', 'shark', 'elephant', 'horse', 'cow']) {
+      await $.command.run(typed(`pet ${id}`))
+      for (const surface of ['terminal', 'desktop'] as const) {
+        const ui = await $.ui.mount({ plugin: 'neko', surface, ...band(100) })
+        expect(await ui.find({ key: 'tip' })).toBeDefined()
+        await ui.unmount()
+      }
+    }
   })
 })

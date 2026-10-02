@@ -1,7 +1,7 @@
 {
   "name": "neko",
   "version": "0.1.0",
-  "description": "แมวผู้ช่วย (Neko): นั่งเหนือช่องพิมพ์ คอยให้คำแนะนำระหว่างทำงาน และตอบคำถามผ่าน /neko",
+  "description": "สัตว์ผู้ช่วย (Neko): แมว หมา นกฮูก วาฬ ฯลฯ นั่งเหนือช่องพิมพ์ คอยให้คำแนะนำระหว่างทำงาน และตอบคำถามผ่าน /neko",
   "author": {
     "name": "nata"
   },
@@ -24,6 +24,26 @@
       "title": "Animate",
       "description": "ให้เหมียวกะพริบตา กระดิกหาง และมีหัวใจลอยตอนงานสำเร็จ",
       "default": true
+    },
+    "pet": {
+      "type": "string",
+      "title": "Pet",
+      "description": "สัตว์ผู้ช่วย (random = สุ่มทุก session) เปลี่ยนระหว่างใช้งานได้ด้วย /neko pet",
+      "options": [
+        "cat",
+        "dog",
+        "wolf",
+        "bird",
+        "owl",
+        "fish",
+        "whale",
+        "shark",
+        "elephant",
+        "horse",
+        "cow",
+        "random"
+      ],
+      "default": "cat"
     }
   }
 }

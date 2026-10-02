@@ -2,6 +2,8 @@ export type NekoMood = 'idle' | 'working' | 'happy' | 'worried' | 'sleepy' | 'th
 
 export type NekoAction = 'type' | 'test' | 'commit' | 'push' | 'install' | 'read' | 'web' | 'agent'
 
+export type NekoPet = 'cat' | 'dog' | 'wolf' | 'bird' | 'owl' | 'fish' | 'whale' | 'shark' | 'elephant' | 'horse' | 'cow'
+
 export type NekoLine = { text: string; at: number }
 
 declare module 'claude-code' {
@@ -14,6 +16,7 @@ declare module 'claude-code' {
       isBlinking: boolean
       tail: number
       sparkle: number
+      pet: NekoPet
     }
   }
 }

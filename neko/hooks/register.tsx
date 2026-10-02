@@ -1,7 +1,9 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderElement } from 'claude-code'
 
-import type { NekoAction, NekoMood } from '../types'
+import type { NekoAction, NekoMood, NekoPet } from '../types'
+import { artWidth, eyeOf, findPet, miniFace, PET_IDS, PETS, pieces, widthOf } from './pets'
+import type { Pet } from './pets'
 
 const line = atom({ plugin: 'neko', key: 'line' } as const, null)
 const mood = atom({ plugin: 'neko', key: 'mood' } as const, 'idle')
@@ -10,6 +12,7 @@ const action = atom({ plugin: 'neko', key: 'action' } as const, null)
 const isBlinking = atom({ plugin: 'neko', key: 'isBlinking' } as const, false)
 const tail = atom({ plugin: 'neko', key: 'tail' } as const, 0)
 const sparkle = atom({ plugin: 'neko', key: 'sparkle' } as const, -1)
+const pet = atom({ plugin: 'neko', key: 'pet' } as const, 'cat')
 
 const HAIKU = 'claude-haiku-4-5-20251001'
 const MAX_LINE = 120
@@ -23,27 +26,20 @@ const UNCOMMITTED_LIMIT = 8
 const TIP_EVERY_TURNS = 3
 const LONG_TURN_MS = 2 * MINUTE
 
-const PERSONA = [
-  'คุณคือ "เหมียว" แมวผู้ช่วยนักพัฒนา แบบ Jarvis แต่เป็นแมว ฉลาด เป็นมิตร พูดภาษาไทย',
-  'ให้คำแนะนำที่ทำได้จริงเรื่องโค้ด วิธีทำงาน git การทดสอบ และสุขภาพนักพัฒนา ไม่น้ำ ไม่ใช้ markdown',
-  'บางครั้งลงท้ายด้วย "เมี้ยว~" แต่ไม่ต้องทุกครั้ง',
-].join('\n')
+function persona(p: Pet): string {
+  return [
+    `คุณคือ "${p.call}" ${p.label}ผู้ช่วยนักพัฒนา แบบ Jarvis แต่เป็น${p.label} ฉลาด เป็นมิตร พูดภาษาไทย`,
+    'ให้คำแนะนำที่ทำได้จริงเรื่องโค้ด วิธีทำงาน git การทดสอบ และสุขภาพนักพัฒนา ไม่น้ำ ไม่ใช้ markdown',
+    `บางครั้งลงท้ายด้วย "${p.flourish}" แต่ไม่ต้องทุกครั้ง`,
+  ].join('\n')
+}
 
 const ONE_LINE = 'ตอบเป็นประโยคเดียว ภาษาไทย ไม่เกิน 90 ตัวอักษร'
 
-const PINK = '#ff8fb8'
+const SPARKLE = '#ff8fb8'
 const TICK_MS = 3500
 const BLINK_MS = 220
 const FLOAT_STEP_MS = 450
-
-const EYES: Record<NekoMood, string> = {
-  idle: '•ω•',
-  working: '-ω-',
-  happy: '^ω^',
-  worried: ';ω;',
-  sleepy: 'ᴗωᴗ',
-  thinking: '•ω•',
-}
 
 const BLINKS: ReadonlySet<NekoMood> = new Set(['idle', 'thinking'])
 
@@ -66,19 +62,21 @@ const MOOD_MARK: Record<NekoMood, string> = {
   thinking: '?',
 }
 
-const TAILS = ['~', 'ʃ']
+/** What the companion holds while Claude is busy with something. */
+const HELD: Record<NekoAction, string> = {
+  type: '✎',
+  test: '⌕',
+  commit: '□',
+  push: '↑',
+  install: '↓',
+  read: '≡',
+  web: '@',
+  agent: '»',
+}
 
-/** The paws row while the cat is busy with something: what it holds. */
-const PAWS: Record<NekoAction | 'rest', string> = {
-  rest: 'ฅ   ฅ',
-  type: 'ฅ ✎ ฅ',
-  test: 'ฅ ⌕ ฅ',
-  commit: 'ฅ[□]ฅ',
-  push: 'ฅ ↑ ฅ',
-  install: 'ฅ ↓ ฅ',
-  read: 'ฅ[≡]ฅ',
-  web: 'ฅ @ ฅ',
-  agent: 'ฅ » ฅ',
+/** The pet the `pet` option names; `random` picks one each session. */
+function petOption(value: unknown): NekoPet | 'random' {
+  return value === 'random' ? 'random' : (findPet(String(value ?? '')) ?? 'cat')
 }
 
 const ACTION_LABEL: Record<NekoAction, string> = {
@@ -103,7 +101,7 @@ const MOOD_LABEL: Record<NekoMood, string> = {
   thinking: ' · กำลังคิด…',
 }
 
-const GREETING = 'สวัสดีเหมียว~ ติดตรงไหนพิมพ์ /neko <คำถาม> ถามได้เลยนะ'
+const greeting = (p: Pet) => `สวัสดี${p.call}~ ติดตรงไหนพิมพ์ /neko <คำถาม> ถามได้เลยนะ`
 
 const TEST_COMMAND = /\b(test|jest|vitest|pytest|mocha|playwright|go test|cargo test|phpunit|rspec)\b/
 
@@ -237,17 +235,18 @@ async function tip($: EngineInterface, prompt: string, useFork: boolean): Promis
     return
   }
   memo.isTipRunning = true
+  const voice = persona(PETS[await read($, pet)])
   const before = await read($, mood)
   const after: NekoMood = before === 'thinking' ? 'idle' : before
   await update($, mood, () => 'thinking')
 
   try {
-    let result = useFork ? await $.model.fork({ prompt: `${PERSONA}\n\n${prompt}\n\n${ONE_LINE}` }) : undefined
+    let result = useFork ? await $.model.fork({ prompt: `${voice}\n\n${prompt}\n\n${ONE_LINE}` }) : undefined
 
     if (result === undefined || (!result.isAnswered && result.reason === 'nothing-to-fork')) {
       result = await $.model.complete({
         model: memo.tipModel,
-        system: PERSONA,
+        system: voice,
         prompt: `${prompt}\n\n${ONE_LINE}`,
         maxTokens: 200,
         effort: 'low',
@@ -269,11 +268,12 @@ async function tip($: EngineInterface, prompt: string, useFork: boolean): Promis
 
 /** Lines the cat says without a model call; the first that applies wins. */
 async function ruleLine($: EngineInterface, now: number, contextPercent: number | undefined): Promise<string | undefined> {
+  const { flourish } = PETS[await read($, pet)]
   if (contextPercent !== undefined && contextPercent >= 80) {
     const bucket = Math.floor(contextPercent / 10)
     if (bucket > memo.lastContextBucket) {
       memo.lastContextBucket = bucket
-      return `context ใช้ไป ${contextPercent}% แล้ว ลอง /compact ก่อนเริ่มงานถัดไปไหม เมี้ยว~`
+      return `context ใช้ไป ${contextPercent}% แล้ว ลอง /compact ก่อนเริ่มงานถัดไปไหม ${flourish}`
     }
   }
 
@@ -285,7 +285,7 @@ async function ruleLine($: EngineInterface, now: number, contextPercent: number 
   if (now - memo.lastBreakAt >= BREAK_EVERY) {
     const worked = now - memo.lastBreakAt
     memo.lastBreakAt = now
-    return `ทำงานมา ${formatMinutes(worked)} แล้ว ลุกยืดเส้นพักสายตาซัก 5 นาทีนะ เมี้ยว~`
+    return `ทำงานมา ${formatMinutes(worked)} แล้ว ลุกยืดเส้นพักสายตาซัก 5 นาทีนะ ${flourish}`
   }
 
   if (now - memo.lastCommitNudgeAt >= COMMIT_NUDGE_EVERY && (await $.session.repo()) !== null) {
@@ -338,7 +338,7 @@ async function tick($: EngineInterface): Promise<void> {
   if (await read($, isHidden)) return
 
   memo.ticks += 1
-  await update($, tail, n => (n + 1) % TAILS.length)
+  await update($, tail, n => (n + 1) % 2)
 
   if (memo.ticks % 2 === 0 && BLINKS.has(await read($, mood))) {
     await update($, isBlinking, () => true)
@@ -371,14 +371,15 @@ async function checkSleepy($: EngineInterface): Promise<void> {
 }
 
 async function askNeko($: EngineInterface, question: string): Promise<string> {
+  const p = PETS[await read($, pet)]
   await update($, mood, () => 'thinking')
   let result = await $.model.fork({
-    prompt: `${PERSONA}\n\nผู้ใช้ถามเหมียวว่า: ${question}\n\nตอบสั้น กระชับ ทำได้จริง เป็นภาษาไทย ไม่เกิน 8 บรรทัด อ้างอิงงานใน session นี้ถ้าเกี่ยวข้อง`,
+    prompt: `${persona(p)}\n\nผู้ใช้ถาม${p.call}ว่า: ${question}\n\nตอบสั้น กระชับ ทำได้จริง เป็นภาษาไทย ไม่เกิน 8 บรรทัด อ้างอิงงานใน session นี้ถ้าเกี่ยวข้อง`,
   })
   if (!result.isAnswered && result.reason === 'nothing-to-fork') {
     result = await $.model.complete({
       model: memo.tipModel,
-      system: PERSONA,
+      system: persona(p),
       prompt: question,
       maxTokens: 800,
       timeoutMs: 60_000,
@@ -387,26 +388,42 @@ async function askNeko($: EngineInterface, question: string): Promise<string> {
 
   if (!result.isAnswered) {
     await update($, mood, () => 'worried')
-    return `ฅ(=;ω;=)ฅ  เหมียวตอบไม่ได้ตอนนี้ (${result.reason}) ลองใหม่อีกทีนะ`
+    return `${miniFace(p, 'worried')}  ${p.call}ตอบไม่ได้ตอนนี้ (${result.reason}) ลองใหม่อีกทีนะ`
   }
 
   const text = result.text.trim()
   await say($, tidy(text), 'happy')
 
-  return `ฅ(=^ω^=)ฅ  เหมียวตอบ:\n\n${text}`
+  return `${miniFace(p, 'happy')}  ${p.call}ตอบ:\n\n${text}`
 }
 
 export const register: Register = (on, options) => {
   memo.autoTips = options.autoTips !== false
   memo.tipModel = typeof options.tipModel === 'string' && options.tipModel.length > 0 ? options.tipModel : HAIKU
   memo.animate = options.animate !== false
+  const chosen = petOption(options.pet)
 
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'neko',
-      description: 'ถามแมวผู้ช่วย: /neko <คำถาม>, /neko (ขอคำแนะนำ), /neko hide|show',
-      argumentHint: '[คำถาม | hide | show]',
+      description: 'ถามสัตว์ผู้ช่วย: /neko <คำถาม>, /neko (ขอคำแนะนำ), /neko pet <ชนิด>, /neko hide|show',
+      argumentHint: '[คำถาม | pet <ชนิด> | hide | show]',
     })
+
+    // The `pet` option wins when it changed since last time; otherwise the
+    // pet picked with /neko pet stays, across sessions.
+    const seenOption = await $.store.get('petOption')
+    const picked = await $.store.get('pet')
+    let current: NekoPet | 'random' = chosen
+    if (seenOption === chosen && typeof picked === 'string') {
+      current = findPet(picked) ?? chosen
+    } else {
+      await $.store.set('petOption', chosen)
+      await $.store.delete('pet')
+    }
+    const resolved: NekoPet =
+      current === 'random' ? (PET_IDS[Math.floor(Math.random() * PET_IDS.length)] ?? 'cat') : current
+    await update($, pet, () => resolved)
 
     const stored = await $.store.get('isHidden')
     if (typeof stored === 'boolean') {
@@ -530,17 +547,40 @@ export const register: Register = (on, options) => {
   on('command.run', { command: 'neko' }, async ($, e) => {
     const args = e.args.trim()
 
+    if (args === 'pet' || args.startsWith('pet ')) {
+      const wanted = args.slice(3).trim()
+      const now = PETS[await read($, pet)]
+
+      if (wanted === '') {
+        const list = PET_IDS.map(id => `  ${id.padEnd(9)}${PETS[id].label.padEnd(8)}${miniFace(PETS[id], 'idle')}`)
+        return { text: `ตอนนี้: ${now.label} ${miniFace(now, 'idle')}\nเปลี่ยนด้วย /neko pet <ชนิด> (ชื่ออังกฤษหรือไทยก็ได้)\n\n${list.join('\n')}` }
+      }
+
+      const found = wanted === 'random' ? PET_IDS[Math.floor(Math.random() * PET_IDS.length)] : findPet(wanted)
+      if (found === undefined) {
+        return { text: `ไม่รู้จัก "${wanted}" ลองพิมพ์ /neko pet เพื่อดูรายชื่อ` }
+      }
+
+      await update($, pet, () => found)
+      await $.store.set('pet', found)
+      const p = PETS[found]
+      await say($, greeting(p), 'happy')
+      return { text: `${miniFace(p, 'happy')}  ${p.call}มาแล้ว! ${p.flourish}` }
+    }
+
     if (args === 'hide' || args === 'show') {
       await setHidden($, args === 'hide')
+      const p = PETS[await read($, pet)]
       return {
-        text: args === 'hide' ? 'เหมียวไปนอนแล้ว (พิมพ์ /neko show เพื่อเรียกกลับ)' : 'เหมียวกลับมาแล้ว เมี้ยว~',
+        text: args === 'hide' ? `${p.call}ไปนอนแล้ว (พิมพ์ /neko show เพื่อเรียกกลับ)` : `${p.call}กลับมาแล้ว ${p.flourish}`,
       }
     }
 
     if (args.length === 0) {
       await tip($, tipPrompt(), true)
       const said = await read($, line)
-      return { text: `ฅ(=^ω^=)ฅ  เหมียว: ${said?.text ?? GREETING}` }
+      const p = PETS[await read($, pet)]
+      return { text: `${miniFace(p, 'happy')}  ${p.call}: ${said?.text ?? greeting(p)}` }
     }
 
     return { text: await askNeko($, args) }
@@ -559,10 +599,14 @@ export const register: Register = (on, options) => {
     const blinking = await read($, isBlinking)
     const swing = await read($, tail)
     const float = await read($, sparkle)
-    const text = said?.text ?? GREETING
-    const eyes = blinking && BLINKS.has(current) ? '-ω-' : EYES[current]
+    const p = PETS[await read($, pet)]
+    const text = said?.text ?? greeting(p)
+    const eye = eyeOf(p, current, blinking && BLINKS.has(current))
     const tint = MOOD_COLOR[current]
     const label = holding === null ? MOOD_LABEL[current] : ACTION_LABEL[holding]
+    const held = holding === null ? ' ' : HELD[holding]
+    const wag = p.tails[memo.animate ? swing % 2 : 0] ?? ''
+    const width = artWidth(p)
     const columns = e.props.bodyColumns
 
     const { Box, Button, Text } = $.ui.resolve(e)
@@ -570,48 +614,57 @@ export const register: Register = (on, options) => {
     // The column beside the art: rising hearts after a good turn, else the mood's mark by the face.
     const beside = (row: number): RenderElement | string =>
       float >= 0 ? (
-        2 - float === row ? <Text color={PINK}>{float === 1 ? '♪' : '♡'}</Text> : ''
-      ) : row === 1 ? (
+        3 - float === row ? <Text color={SPARKLE}>{float === 1 ? '♪' : '♡'}</Text> : ''
+      ) : row === (p.faceRow ?? 1) ? (
         <Text color={tint}>{MOOD_MARK[current]}</Text>
       ) : (
         ''
       )
 
+    // One row of the art: the outline in the pet's colour, the eyes by mood.
+    const drawRow = (template: string, row: number): RenderElement => {
+      const parts = pieces(template, eye, held, wag)
+      const pad = ' '.repeat(Math.max(0, width - widthOf(parts)) + 2)
+
+      return (
+        <Text>
+          {parts.map(part =>
+            part.kind === 'eye' ? (
+              <Text color={tint} bold>
+                {part.text}
+              </Text>
+            ) : part.kind === 'held' ? (
+              <Text bold>{part.text}</Text>
+            ) : (
+              <Text color={p.color}>{part.text}</Text>
+            ),
+          )}
+          {pad}
+          {beside(row)}
+        </Text>
+      )
+    }
+
     const mine: RenderElement =
       columns < 60 ? (
         <Box key="neko" flexDirection="row" gap={1}>
           <Text>
-            <Text color={PINK}>ฅ(=</Text>
-            <Text color={tint}>{eyes}</Text>
-            <Text color={PINK}>=)ฅ</Text>
+            {pieces(p.mini, eye, ' ', '').map(part =>
+              part.kind === 'eye' ? <Text color={tint}>{part.text}</Text> : <Text color={p.color}>{part.text}</Text>,
+            )}
           </Text>
           <Text wrap="truncate-end">{text}</Text>
         </Box>
       ) : (
         <Box key="neko" flexDirection="row" gap={1}>
-          <Box flexDirection="column" width={13} flexShrink={0}>
-            <Text>
-              <Text color={PINK}>{'  /\\_/\\   '}</Text>
-              {beside(0)}
-            </Text>
-            <Text>
-              {' ('}
-              <Text color={PINK}>=</Text>
-              <Text color={tint} bold>{eyes}</Text>
-              <Text color={PINK}>=</Text>
-              {')  '}
-              {beside(1)}
-            </Text>
-            <Text>
-              {`  ${PAWS[holding ?? 'rest']} `}
-              <Text color={PINK}>{memo.animate ? TAILS[swing % TAILS.length] : TAILS[0]}</Text>
-              {' '}
-              {beside(2)}
-            </Text>
+          <Box flexDirection="column" width={width + 5} flexShrink={0}>
+            {p.rows.map((template, row) => drawRow(template, row))}
           </Box>
-          <Box flexDirection="column" width={Math.max(20, columns - 14)}>
+          <Box flexDirection="column" width={Math.max(20, columns - width - 6)}>
             <Text>
-              <Text bold>เหมียว</Text>
+              <Text bold color={p.color}>
+                {p.call}
+              </Text>
               <Text dimColor>{label}</Text>
             </Text>
             <Text wrap="truncate-end">{text}</Text>
