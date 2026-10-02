@@ -1,0 +1,7 @@
+{
+  "name": "dev-dashboard",
+  "version": "0.1.0",
+  "description": "A live pane of this session: files edited, recent commands, checks, denials, turns and usage",
+  "author": { "name": "nata" },
+  "types": "./types/index.d.ts"
+}

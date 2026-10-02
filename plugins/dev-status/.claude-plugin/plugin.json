@@ -1,0 +1,7 @@
+{
+  "name": "dev-status",
+  "version": "0.1.0",
+  "description": "Status line: git branch, context window, rate limits with reset times, session cost and RTK savings",
+  "author": { "name": "nata" },
+  "types": "./types/index.d.ts"
+}

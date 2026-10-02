@@ -1,0 +1,28 @@
+{
+  "name": "done-notify",
+  "version": "0.1.0",
+  "description": "Sound, toast and macOS notification when a long turn finishes or Claude is waiting for you",
+  "author": {
+    "name": "nata"
+  },
+  "userConfig": {
+    "minSeconds": {
+      "type": "number",
+      "title": "Minimum turn length (seconds)",
+      "description": "Only notify for turns that ran at least this long",
+      "default": 30
+    },
+    "sound": {
+      "type": "boolean",
+      "title": "Play a sound",
+      "description": "Play a sound with each notification",
+      "default": true
+    },
+    "systemNotification": {
+      "type": "boolean",
+      "title": "macOS notification",
+      "description": "Also post a macOS Notification Center banner",
+      "default": true
+    }
+  }
+}

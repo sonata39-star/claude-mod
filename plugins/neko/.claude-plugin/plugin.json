@@ -1,0 +1,29 @@
+{
+  "name": "neko",
+  "version": "0.1.0",
+  "description": "แมวผู้ช่วย (Neko): นั่งเหนือช่องพิมพ์ คอยให้คำแนะนำระหว่างทำงาน และตอบคำถามผ่าน /neko",
+  "author": {
+    "name": "nata"
+  },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "autoTips": {
+      "type": "boolean",
+      "title": "Auto tips",
+      "description": "ให้แมวคิดคำแนะนำเองหลังเทิร์นที่น่าสนใจ (เรียก model ไม่เกินครั้งละเทิร์น)",
+      "default": true
+    },
+    "tipModel": {
+      "type": "string",
+      "title": "Tip model",
+      "description": "model ที่ใช้คิดคำแนะนำอัตโนมัติ",
+      "default": "claude-haiku-4-5-20251001"
+    },
+    "animate": {
+      "type": "boolean",
+      "title": "Animate",
+      "description": "ให้เหมียวกะพริบตา กระดิกหาง และมีหัวใจลอยตอนงานสำเร็จ",
+      "default": true
+    }
+  }
+}

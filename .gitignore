@@ -1,0 +1,10 @@
+# Written by Claude Code each time it loads a mod from disk
+plugins/*/.claude-plugin/types/
+plugins/*/tsconfig.json
+
+node_modules/
+.DS_Store
+
+# Local Claude Code session files
+.claude/
+plugins/.claude/

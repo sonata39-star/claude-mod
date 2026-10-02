@@ -1,0 +1,22 @@
+{
+  "name": "auto-check",
+  "version": "0.1.0",
+  "description": "Runs the project's linter after each edit and its type-checker before Claude stops, handing failures back to Claude",
+  "author": {
+    "name": "nata"
+  },
+  "userConfig": {
+    "enabled": {
+      "type": "boolean",
+      "title": "Enabled",
+      "description": "Run checks after Claude edits a file",
+      "default": true
+    },
+    "typecheckOnStop": {
+      "type": "boolean",
+      "title": "Type-check before stopping",
+      "description": "Run tsc / go vet once when Claude is about to end its turn, and send new errors back",
+      "default": true
+    }
+  }
+}

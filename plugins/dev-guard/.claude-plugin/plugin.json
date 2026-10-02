@@ -1,0 +1,8 @@
+{
+  "name": "dev-guard",
+  "version": "0.1.0",
+  "description": "Blocks catastrophic commands, asks before risky ones, and stops secrets from being written into files",
+  "author": {
+    "name": "nata"
+  }
+}

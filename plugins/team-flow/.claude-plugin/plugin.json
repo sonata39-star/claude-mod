@@ -1,0 +1,9 @@
+{
+  "name": "team-flow",
+  "version": "0.1.0",
+  "description": "Band above the prompt showing the BA → Lead → Dev → Review → Sec pipeline from .team/ files",
+  "types": "./types/index.d.ts",
+  "author": {
+    "name": "nata"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "standup",
+  "version": "0.1.0",
+  "description": "/standup: a Thai daily standup from today's git commits and this session's work",
+  "author": {
+    "name": "nata"
+  }
+}
