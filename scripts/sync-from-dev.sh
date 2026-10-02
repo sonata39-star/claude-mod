@@ -16,6 +16,7 @@ for mod in "$src"/*/; do
     --exclude 'tsconfig.json' \
     --exclude 'node_modules/' \
     --exclude '.DS_Store' \
+    --exclude 'README.md' \
     "$mod" "$dest/$name/"
   echo "synced $name"
 done

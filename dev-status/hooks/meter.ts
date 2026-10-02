@@ -33,6 +33,26 @@ export function miniBar(percentUsed: number, cells = 8): string {
   return FILL.repeat(filled) + EMPTY.repeat(cells - filled)
 }
 
+// The same short meter as coloured runs: the used cells by level, the rest dim.
+export function miniBarRuns(percentUsed: number, cells = 8): Run[] {
+  const filled = clamp(Math.round((percentUsed / 100) * cells), 0, cells)
+  const runs: Run[] = []
+
+  if (filled > 0) {
+    runs.push({ text: FILL.repeat(filled), color: levelColor(percentUsed) })
+  }
+  if (cells - filled > 0) {
+    runs.push({ text: EMPTY.repeat(cells - filled), isDim: true })
+  }
+
+  return runs
+}
+
+// How many cells the runs take; every glyph they hold is one cell wide.
+export function runsWidth(runs: readonly Run[]): number {
+  return runs.reduce((sum, run) => sum + [...run.text].length, 0)
+}
+
 // A full-width meter as coloured runs, with an optional mark (the
 // auto-compact threshold) at `markPercent` of the width.
 export function barRuns(percentUsed: number, width: number, markPercent?: number): Run[] {

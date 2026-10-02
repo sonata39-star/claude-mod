@@ -1,7 +1,8 @@
 import type { SessionRateLimit, SessionUsage } from 'claude-code'
 
 import type { DevStatusUsage } from '../types'
-import { miniBar, resetAt } from './meter'
+import { levelColor, miniBar, miniBarRuns, resetAt, runsWidth } from './meter'
+import type { Run } from './meter'
 
 export type Git = { branch: string; dirty: number; ahead: number; behind: number }
 
@@ -129,13 +130,15 @@ export function contextLabel(usage: SessionUsage): string {
   return `${flag}ctx ${miniBar(used)} ${used}% ${compact(tokens)}`
 }
 
-export function statusLine(snapshot: Snapshot, now: number): string | undefined {
+// The plain status line; with `isMetersShown` false (the coloured hint row
+// draws them) only what the hint row does not: git and rtk.
+export function statusLine(snapshot: Snapshot, now: number, isMetersShown = true): string | undefined {
   const parts: string[] = []
 
   if (snapshot.git) {
     parts.push(gitLabel(snapshot.git))
   }
-  if (snapshot.usage) {
+  if (snapshot.usage && isMetersShown) {
     parts.push(contextLabel(snapshot.usage))
     parts.push(...snapshot.usage.rateLimits.map(limit => limitLabel(limit, now)))
     if (snapshot.usage.cost) {
@@ -147,6 +150,79 @@ export function statusLine(snapshot: Snapshot, now: number): string | undefined 
   }
 
   return parts.length > 0 ? parts.join(SEP) : undefined
+}
+
+// How much the hint row's meters say: cells per meter, the limits' reset
+// times, the cost. Tried in this order until one fits.
+export type HintVariant = { cells: number; isResetShown: boolean; isCostShown: boolean }
+
+export const HINT_VARIANTS: readonly HintVariant[] = [
+  { cells: 8, isResetShown: true, isCostShown: true },
+  { cells: 8, isResetShown: true, isCostShown: false },
+  { cells: 5, isResetShown: true, isCostShown: false },
+  { cells: 5, isResetShown: false, isCostShown: false },
+  { cells: 3, isResetShown: false, isCostShown: false },
+  { cells: 0, isResetShown: false, isCostShown: false },
+]
+
+const HINT_SEP: Run = { text: ' │ ', isDim: true }
+
+function meterRuns(label: string, percentUsed: number, shown: string, cells: number): Run[] {
+  const color = levelColor(percentUsed)
+
+  return cells > 0
+    ? [{ text: `${label} `, isDim: true }, ...miniBarRuns(percentUsed, cells), { text: ` ${shown}`, color }]
+    : [{ text: `${label} `, isDim: true }, { text: shown, color }]
+}
+
+// The hint row's meters, coloured by level:
+// "ctx ▰▰▰▱▱▱▱▱ 42% │ 5h ▰▰▱▱▱▱▱▱ 24% ↻14:30 │ 7d ▰▱▱▱▱▱▱▱ 9% ↻จ. 09:00 │ $1.23"
+export function hintRuns(snap: DevStatusUsage, variant: HintVariant): Run[] {
+  const groups: Run[][] = []
+
+  if (snap.contextPercent !== undefined) {
+    groups.push(meterRuns('ctx', snap.contextPercent, `${snap.contextPercent}%`, variant.cells))
+  }
+  for (const limit of snap.limits) {
+    const runs = meterRuns(limitShort(limit.kind), limit.percentUsed, percent(limit.percentUsed), variant.cells)
+    const at = variant.isResetShown ? resetAt(limit.resetsAt, snap.at) : undefined
+    groups.push(at === undefined ? runs : [...runs, { text: ` ↻${at}`, isDim: true }])
+  }
+  if (variant.isCostShown && snap.costUsd !== undefined && groups.length > 0) {
+    groups.push([{ text: `$${snap.costUsd.toFixed(2)}`, isDim: true }])
+  }
+
+  return groups.flatMap((group, i) => (i === 0 ? group : [HINT_SEP, ...group]))
+}
+
+// What the hint row draws in `room` cells beside the engine's own line of
+// `engineWidth` (0 when it has none): the richest meters that fit beside it;
+// else, where the engine's line may go, the richest that fit alone; else
+// nothing (undefined), and the engine draws its line as ever.
+export function planHint(
+  snap: DevStatusUsage,
+  room: number,
+  engineWidth: number,
+  isEngineKept: boolean,
+): { runs: Run[]; isEngineShown: boolean } | undefined {
+  const variants = HINT_VARIANTS.map(variant => hintRuns(snap, variant))
+
+  if (variants[0]?.length === 0) {
+    return undefined
+  }
+
+  const beside = engineWidth > 0 ? engineWidth + runsWidth([HINT_SEP]) : 0
+  const fitting = variants.find(runs => beside + runsWidth(runs) <= room)
+  if (fitting) {
+    return { runs: fitting, isEngineShown: engineWidth > 0 }
+  }
+  if (isEngineKept) {
+    return undefined
+  }
+
+  const alone = variants.find(runs => runsWidth(runs) <= room)
+
+  return alone ? { runs: alone, isEngineShown: false } : undefined
 }
 
 // The figures the usage pane draws, kept in $.state so the pane redraws when

@@ -11,6 +11,7 @@ import {
   parseGitStatus,
   parseRtk,
   percent,
+  planHint,
   statusLine,
   usageState,
 } from './format'
@@ -29,6 +30,13 @@ const BREAKDOWN_EVERY_MS = 20_000
 const LIMIT_THRESHOLDS = [95, 80]
 const CONTEXT_THRESHOLD = 80
 const WATCHED_TOOLS = new Set(['Bash', 'Edit', 'Write', 'NotebookEdit'])
+// Cells the hint row leaves free at its end, and its width where the
+// surface has not measured.
+const HINT_RESERVE = 4
+const HINT_COLUMNS = 120
+
+// Where the meters go, from the `meterPlace` option; set at each load.
+let meterPlace: 'hint' | 'status' = 'hint'
 
 // This load's own memory: a reload starts these over, which costs one extra
 // `rtk gain` run and one breakdown at most.
@@ -112,6 +120,22 @@ async function readBreakdown($: EngineInterface, now: number, isForced: boolean)
   return breakdown
 }
 
+// Whether every surface the session draws on draws the hint row (terminal
+// and desktop do; vscode and mobile do not), so the meters may leave the
+// plain status line for it.
+async function isHintDrawn($: EngineInterface): Promise<boolean> {
+  if (meterPlace !== 'hint') {
+    return false
+  }
+  try {
+    const surfaces = await $.session.surfaces()
+
+    return surfaces.length > 0 && surfaces.every(surface => surface === 'terminal' || surface === 'desktop')
+  } catch {
+    return false
+  }
+}
+
 async function snapshot($: EngineInterface): Promise<{ snap: Snapshot; now: number }> {
   const now = await $.clock.now()
   const [git, usage, rtkNow] = await Promise.all([readGit($), readUsage($), readRtk($, now)])
@@ -167,7 +191,7 @@ async function warn($: EngineInterface, usage: SessionUsage | undefined, now: nu
 
 async function refreshOnce($: EngineInterface, isForced: boolean) {
   const { snap, now } = await snapshot($)
-  $.ui.status(statusLine(snap, now))
+  $.ui.status(statusLine(snap, now, !(await isHintDrawn($))))
   if (snap.usage) {
     const usage = snap.usage
     const deep = await readBreakdown($, now, isForced)
@@ -266,7 +290,9 @@ function metersOf(snap: DevStatusUsage): Meter[] {
   return [context, ...limits]
 }
 
-export const register: Register = on => {
+export const register: Register = (on, options) => {
+  meterPlace = options.meterPlace === 'status' ? 'status' : 'hint'
+
   on('session.start', async ($, e, next) => {
     const started = await next(e)
 
@@ -325,6 +351,70 @@ export const register: Register = on => {
     }
 
     return ran
+  })
+
+  // A surface coming or going may change where the meters can show.
+  on('session.attach', async ($, e, next) => {
+    const done = await next(e)
+    void refresh($)
+
+    return done
+  })
+
+  on('session.detach', async ($, e, next) => {
+    const done = await next(e)
+    void refresh($)
+
+    return done
+  })
+
+  // The meters in colour on the hint row under the prompt, after the
+  // engine's own hint. While the person types or a turn runs, the engine's
+  // line says something they need (how to send, how to interrupt), so it
+  // always stays and the meters shrink or step aside; when idle its line is
+  // the `? for shortcuts` reminder, which gives way on a narrow terminal.
+  on('ui.render', { component: 'PromptHint' }, async ($, e, next) => {
+    const snap = meterPlace === 'hint' ? await read($, usageNow) : null
+    if (snap === null) {
+      return next(e)
+    }
+
+    const columns = e.viewport?.columns ?? HINT_COLUMNS
+    const tail = e.props.tail === undefined ? 0 : [...e.props.tail].length + 1
+    const engineWidth = e.props.hint.trim() === '' ? 0 : [...e.props.hint].length + tail
+    const plan = planHint(snap, columns - HINT_RESERVE, engineWidth, e.props.isDraft || e.props.isWorking)
+    if (!plan) {
+      return next(e)
+    }
+
+    const { Box, Text } = $.ui.resolve(e)
+    const meters = (
+      <Text wrap="truncate-end">
+        {plan.runs.map(run =>
+          run.color ? (
+            <Text color={run.color}>{run.text}</Text>
+          ) : run.isDim ? (
+            <Text dimColor>{run.text}</Text>
+          ) : (
+            <Text>{run.text}</Text>
+          ),
+        )}
+      </Text>
+    )
+
+    if (!plan.isEngineShown) {
+      return <Box flexDirection="row">{meters}</Box>
+    }
+
+    const engine = await next(e)
+
+    return (
+      <Box flexDirection="row">
+        {engine}
+        <Text dimColor> │ </Text>
+        {meters}
+      </Box>
+    )
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {

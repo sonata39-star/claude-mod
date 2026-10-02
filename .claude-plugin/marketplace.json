@@ -32,7 +32,7 @@
     {
       "name": "dev-status",
       "source": "./dev-status",
-      "description": "Progress-bar status line and /usage-bars view: git branch, context window, rate limits with reset times, session cost",
+      "description": "Colored progress bars under the prompt for context, 5-hour and 7-day limits with reset times and cost, plus a /usage-bars view",
       "version": "0.1.0",
       "category": "productivity"
     },

@@ -3,5 +3,14 @@
   "version": "0.1.0",
   "description": "Status line: git branch, context window, rate limits with reset times, session cost and RTK savings",
   "author": { "name": "nata" },
-  "types": "./types/index.d.ts"
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "meterPlace": {
+      "type": "string",
+      "title": "Usage meters",
+      "description": "hint: coloured meters on the hint row under the prompt (status line keeps git and rtk); status: everything on the plain status line",
+      "options": ["hint", "status"],
+      "default": "hint"
+    }
+  }
 }
