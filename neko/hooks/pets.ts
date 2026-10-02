@@ -28,9 +28,10 @@ export type Pet = {
 // A pet in pixels, two to a terminal cell, drawn with ▀ ▄ █ and a background
 // colour the way Claude Code's own mascot is.
 export type Sprite = {
-  // Eight rows: '.' is empty, 'e' an eye (both pixels of one cell), 't' and
-  // 'u' the tail on either swing, any other letter a colour of `colors`.
-  pixels: readonly [string, string, string, string, string, string, string, string]
+  // Two rows to a terminal row, eight for most: '.' is empty, 'e' an eye (both
+  // pixels of one cell), 't' and 'u' the tail on either swing, any other
+  // letter a colour of `colors`.
+  pixels: readonly string[]
   // 'b' is the body. 's' shows round a shut eye and 't' is the tail, both 'b'
   // when left out.
   colors: Readonly<Record<string, string>>
@@ -48,15 +49,18 @@ export const PETS: Record<NekoPet, Pet> = {
     mini: 'ฅ(={L}ω{R}=)ฅ',
     tails: ['~', 'ʃ'],
     sprite: {
+      // Ten rows, not eight: on eight the body under its head was a squat blob.
       pixels: [
         '.b.....b......',
-        '.ab...ba....t.',
-        'bbebbbebb..t.t',
-        'bbebbbebb..t..',
-        'bbbbabbbb..t..',
+        '.ab...ba......',
+        'bbebbbebb.....',
+        'bbebbbebb...t.',
+        'bbbbabbbb..t.t',
         '.bbbbbbb...t..',
-        '.bwwwwwbb.t..u',
-        'bbwwwwwbbbuuu.',
+        '..bbwbbb...t..',
+        '..bwwwbb...t..',
+        '..bwwwbbb.t..u',
+        '.bwwbwwbbbuuu.',
       ],
       colors: { b: '#ff8fb8', a: '#ff5f87', w: '#ffe0ec' },
       hold: [4, 3],
@@ -394,6 +398,11 @@ export function spriteWidth(sprite: Sprite): number {
   return Math.max(...sprite.pixels.map(row => row.length))
 }
 
+// How many terminal rows it takes.
+export function spriteHeight(sprite: Sprite): number {
+  return Math.ceil(sprite.pixels.length / 2)
+}
+
 // The terminal row its eyes are on.
 export function spriteFaceRow(sprite: Sprite): number {
   return Math.floor(Math.max(0, sprite.pixels.findIndex(row => row.includes('e'))) / 2)
@@ -433,14 +442,14 @@ function cellOf(top: string | undefined, bottom: string | undefined): Cell {
   return top === bottom ? { text: '█', color: top } : { text: '▀', color: top, backgroundColor: bottom }
 }
 
-// The sprite's four terminal rows, each a list of runs. `eye` colours the
-// eyes (DARK when undefined), `swing` picks the tail, and `held`, when given,
-// shows in the hold cell.
+// The sprite's terminal rows, each a list of runs. `eye` colours the eyes
+// (DARK when undefined), `swing` picks the tail, and `held`, when given, shows
+// in the hold cell.
 export function spriteRows(sprite: Sprite, eye: string | undefined, shape: EyeShape, swing: number, held?: string): Cell[][] {
   const width = spriteWidth(sprite)
   const [holdX, holdRow] = sprite.hold
 
-  return [0, 1, 2, 3].map(row => {
+  return Array.from({ length: spriteHeight(sprite) }, (_, row) => {
     const runs: Cell[] = []
     for (let x = 0; x < width; x++) {
       const top = pixel(sprite, x, row * 2, eye, shape, swing)

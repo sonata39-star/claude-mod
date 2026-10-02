@@ -12,6 +12,7 @@ import {
   PETS,
   pieces,
   spriteFaceRow,
+  spriteHeight,
   spriteRows,
   spriteWidth,
   widthOf,
@@ -626,13 +627,14 @@ export const register: Register = (on, options) => {
     const sprite = memo.isPixel && e.surface === 'terminal' ? p.sprite : undefined
     const width = sprite === undefined ? artWidth(p) : spriteWidth(sprite)
     const faceRow = sprite === undefined ? (p.faceRow ?? 1) : spriteFaceRow(sprite)
+    const bottomRow = (sprite === undefined ? p.rows.length : spriteHeight(sprite)) - 1
 
     const { Box, Button, Text } = $.ui.resolve(e)
 
     // The column beside the art: rising hearts after a good turn, else the mood's mark by the face.
     const beside = (row: number): RenderElement | string =>
       float >= 0 ? (
-        3 - float === row ? <Text color={SPARKLE}>{float === 1 ? '♪' : '♡'}</Text> : ''
+        bottomRow - float === row ? <Text color={SPARKLE}>{float === 1 ? '♪' : '♡'}</Text> : ''
       ) : row === faceRow ? (
         <Text color={tint}>{MOOD_MARK[current]}</Text>
       ) : (

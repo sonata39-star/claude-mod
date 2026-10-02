@@ -33,6 +33,10 @@ const artOf = async (ui: Band) => (await ui.find({ key: 'art' }))?.text ?? ''
 const openEyes = async (ui: Band) =>
   (await ui.findAll({ type: 'Text', text: '█' })).filter(one => one.props.color === DARK).length
 const BLOCKS = /[▀▄█]/
+/** The art column row by row, as plain text. */
+const textOf = (node: unknown): string =>
+  typeof node === 'string' ? node : ((node as { children?: unknown[] }).children ?? []).map(textOf).join('')
+const rowsOf = async (ui: Band) => ((await ui.find({ key: 'art' }))?.children ?? []).map(textOf)
 
 const world = (on: On) => {
   mock.store(on)
@@ -262,9 +266,9 @@ describe('looks', () => {
     await $.turn.complete({ answer: 'done', durationMs: 1_000, isAborted: false, turnId: 't1', reason: 'answer' })
 
     const ui = await $.ui.mount({ plugin: 'neko', surface: 'terminal', ...band(100) })
-    expect(await ui.find({ type: 'Text', text: '♡' })).toBeDefined()
+    expect((await rowsOf(ui)).findIndex(row => row.includes('♡'))).toBe(4)
     await clock.advance(450)
-    expect(await ui.find({ type: 'Text', text: '♪' })).toBeDefined()
+    expect((await rowsOf(ui)).findIndex(row => row.includes('♪'))).toBe(3)
     await clock.advance(1_000)
     expect(await ui.find({ type: 'Text', text: '♡' })).toBeUndefined()
     expect(await ui.find({ type: 'Text', text: '♪' })).toBeDefined()
@@ -385,7 +389,7 @@ describe('pets', () => {
     expect(await ui.find({ type: 'Text', text: /woof|މ/ })).toBeUndefined()
   })
 
-  test('every companion draws four rows on every surface', async ($, on) => {
+  test('every companion draws four rows on every surface, the cat five in pixels', async ($, on) => {
     started(on)
     await $.session.start({ cwd: '/work', surface: 'terminal', isInteractive: true })
 
@@ -394,7 +398,7 @@ describe('pets', () => {
       for (const surface of ['terminal', 'desktop'] as const) {
         const ui = await $.ui.mount({ plugin: 'neko', surface, ...band(100) })
         expect(await ui.find({ key: 'tip' })).toBeDefined()
-        expect((await ui.find({ key: 'art' }))?.children).toHaveLength(4)
+        expect((await ui.find({ key: 'art' }))?.children).toHaveLength(id === 'cat' && surface === 'terminal' ? 5 : 4)
         expect(BLOCKS.test(await artOf(ui))).toBe(surface === 'terminal')
         await ui.unmount()
       }
