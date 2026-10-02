@@ -10,56 +10,56 @@
   "plugins": [
     {
       "name": "dev-guard",
-      "source": "./plugins/dev-guard",
+      "source": "./dev-guard",
       "description": "Blocks catastrophic commands, asks before risky ones, and stops secrets from being written into files",
       "version": "0.1.0",
       "category": "security"
     },
     {
       "name": "auto-check",
-      "source": "./plugins/auto-check",
+      "source": "./auto-check",
       "description": "Runs the project's linter after each edit and its type-checker before Claude stops, handing failures back to Claude",
       "version": "0.1.0",
       "category": "development"
     },
     {
       "name": "done-notify",
-      "source": "./plugins/done-notify",
+      "source": "./done-notify",
       "description": "Sound, toast and macOS notification when a long turn finishes or Claude is waiting for you",
       "version": "0.1.0",
       "category": "productivity"
     },
     {
       "name": "dev-status",
-      "source": "./plugins/dev-status",
+      "source": "./dev-status",
       "description": "Progress-bar status line and /usage-bars view: git branch, context window, rate limits with reset times, session cost",
       "version": "0.1.0",
       "category": "productivity"
     },
     {
       "name": "dev-dashboard",
-      "source": "./plugins/dev-dashboard",
+      "source": "./dev-dashboard",
       "description": "A live pane of this session: files edited, recent commands, checks, denials, turns and usage",
       "version": "0.1.0",
       "category": "productivity"
     },
     {
       "name": "team-flow",
-      "source": "./plugins/team-flow",
+      "source": "./team-flow",
       "description": "Band above the prompt showing the BA → Lead → Dev → Review → Sec pipeline from .team/ files",
       "version": "0.1.0",
       "category": "productivity"
     },
     {
       "name": "standup",
-      "source": "./plugins/standup",
+      "source": "./standup",
       "description": "/standup: a Thai daily standup from today's git commits and this session's work",
       "version": "0.1.0",
       "category": "productivity"
     },
     {
       "name": "neko",
-      "source": "./plugins/neko",
+      "source": "./neko",
       "description": "แมวผู้ช่วย (Neko): นั่งเหนือช่องพิมพ์ คอยให้คำแนะนำระหว่างทำงาน และตอบคำถามผ่าน /neko",
       "version": "0.1.0",
       "category": "productivity"

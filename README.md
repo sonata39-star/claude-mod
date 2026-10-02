@@ -232,14 +232,14 @@ review ได้ FAIL หรือ sec ได้ BLOCK → กลับไปท
 แก้ mod แบบ hot reload ได้โดยชี้ Claude Code มาที่โฟลเดอร์ใน repo นี้:
 
 ```bash
-claude --plugin-dir plugins/neko
+claude --plugin-dir neko
 ```
 
 ตรวจและรัน test:
 
 ```bash
-claude plugin validate plugins/neko
-claude plugin test plugins/neko
+claude plugin validate neko
+claude plugin test neko
 ```
 
 ถ้าแก้ใน dev-mods ของ session ให้ copy กลับมาที่ repo ด้วย `scripts/sync-from-dev.sh ~/.claude/dev-mods/<session-id>`
